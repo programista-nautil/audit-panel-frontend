@@ -1,14 +1,7 @@
 import AdminLayout from '@/components/layout/AdminLayout'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/authOptions'
+import { withAuth } from '@/lib/withAuth'
 
-export default async function AdminDashboard() {
-	const session = await getServerSession(authOptions)
-
-	if (!session || session.user.role !== 'ADMIN') {
-		return <p className='p-10 text-red-700 font-bold'>Brak dostępu</p>
-	}
-
+function AdminDashboard({ session }) {
 	return (
 		<AdminLayout>
 			<h2 className='text-2xl font-bold text-gray-800 mb-4'>Witaj {session.user.name}!</h2>
@@ -29,3 +22,6 @@ export default async function AdminDashboard() {
 		</AdminLayout>
 	)
 }
+
+export const dynamic = 'force-dynamic'
+export default withAuth({ role: 'ADMIN' })(AdminDashboard)

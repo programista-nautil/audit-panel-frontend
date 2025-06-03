@@ -9,7 +9,7 @@ export default async function Page() {
 
 	if (!session || session.user.role !== 'ADMIN') {
 		// Przekieruj, jeśli brak uprawnień
-		return redirect('/admin/login')
+		return redirect('/login')
 	}
 
 	// Przekaż sesję jako prop do komponentu klienckiego

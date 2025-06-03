@@ -40,8 +40,7 @@ export default function Sidebar() {
 	]
 
 	return (
-		<div
-			className={`w-64 h-screen ${isClient ? 'bg-red-600 text-white' : 'bg-white text-gray-800'} shadow-md border-r`}>
+		<div className={`w-64 h-screen ${isClient ? 'bg-red-600 text-white' : 'bg-white text-gray-800'} shadow-md`}>
 			{/* Logo */}
 			<div className='p-6 flex justify-center items-center'>
 				<img src='/nautil-logo-czarne.svg' alt='Logo' className='h-12 w-auto' />

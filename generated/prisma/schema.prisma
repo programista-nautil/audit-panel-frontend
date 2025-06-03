@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          Role
+  name          String
+  organization  String?
+  createdAt     DateTime @default(now())
+  audits        Audit[]  @relation("ClientAudits")
+  createdAudits Audit[]  @relation("CreatedByAudits")
+}
+
+model Audit {
+  id          String      @id @default(cuid())
+  title       String
+  clientId    String
+  createdById String
+  status      AuditStatus
+  createdAt   DateTime    @default(now())
+
+  client    User    @relation("ClientAudits", fields: [clientId], references: [id])
+  createdBy User    @relation("CreatedByAudits", fields: [createdById], references: [id])
+  errors    Error[]
+  files     File[]
+}
+
+model Error {
+  id               String        @id @default(cuid())
+  auditId          String
+  title            String
+  description      String
+  category         ErrorCategory
+  severity         ErrorSeverity
+  recommendationAI String?
+  isResolved       Boolean       @default(false)
+
+  audit Audit @relation(fields: [auditId], references: [id])
+}
+
+model File {
+  id       String   @id @default(cuid())
+  auditId  String
+  filename String
+  url      String
+  type     FileType
+
+  audit Audit @relation(fields: [auditId], references: [id])
+}
+
+enum Role {
+  ADMIN
+  CLIENT
+}
+
+enum AuditStatus {
+  DRAFT
+  SENT
+  COMPLETED
+  ARCHIVED
+}
+
+enum ErrorCategory {
+  KONTRAST
+  TEKST
+  STRUKTURA
+  OBRAZY
+  MULTIMEDIA
+  FORMULARZE
+  INNE
+}
+
+enum ErrorSeverity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum FileType {
+  PDF
+  IMG
+  CSV
+  DOC
+}

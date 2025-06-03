@@ -27,7 +27,9 @@ export default function Topbar() {
 				<button
 					onClick={() => signOut({ callbackUrl: '/login' })}
 					className={`text-sm px-4 py-1 rounded font-semibold transition ${
-						isClient ? 'bg-white text-red-600 hover:bg-red-100' : 'bg-red-600 text-white hover:bg-red-700'
+						isClient
+							? 'bg-white text-red-600 hover:bg-red-100'
+							: 'bg-red-700 text-white hover:bg-red-800 cursor-pointer'
 					}`}>
 					Wyloguj się
 				</button>

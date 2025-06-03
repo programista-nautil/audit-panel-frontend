@@ -1,9 +1,9 @@
-import AdminLayout from '@/components/layout/AdminLayout'
+import PanelLayout from '@/components/layout/PanelLayout'
 import { withAuth } from '@/lib/withAuth'
 
 function AdminDashboard({ session }) {
 	return (
-		<AdminLayout>
+		<PanelLayout>
 			<h2 className='text-2xl font-bold text-gray-800 mb-4'>Witaj {session.user.name}!</h2>
 			<div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
 				<div className='bg-white p-6 shadow rounded-lg border-l-4 border-red-600'>
@@ -19,7 +19,7 @@ function AdminDashboard({ session }) {
 					<p className='text-2xl font-bold text-red-700 mt-2'>3</p>
 				</div>
 			</div>
-		</AdminLayout>
+		</PanelLayout>
 	)
 }
 

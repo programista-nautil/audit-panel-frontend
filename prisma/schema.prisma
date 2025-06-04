@@ -47,9 +47,9 @@ model Report {
   auditId     String
   title       String
   description String?
-  version     String   // np. "v1", "zaktualizowany", "archiwalny"
+  version     String   
   createdAt   DateTime @default(now())
-  fileUrl     String   // ścieżka do pliku PDF lub innego
+  fileUrl     String 
 
   audit       Audit    @relation(fields: [auditId], references: [id])
 }

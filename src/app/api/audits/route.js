@@ -6,39 +6,65 @@ import { v4 as uuid } from 'uuid'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 
+// export async function POST(req) {
+// 	const session = await getServerSession(authOptions)
+// 	if (!session || session.user.role !== 'ADMIN') {
+// 		return new NextResponse('Unauthorized', { status: 401 })
+// 	}
+
+// 	const data = await req.formData()
+// 	const clientId = data.get('clientId')
+// 	const title = data.get('title')
+// 	const file = data.get('file')
+
+// 	const bytes = await file.arrayBuffer()
+// 	const buffer = Buffer.from(bytes)
+
+// 	const filename = `${uuid()}.pdf`
+// 	const uploadPath = path.join(process.cwd(), 'public/uploads', filename)
+// 	await writeFile(uploadPath, buffer)
+
+// 	const audit = await prisma.audit.create({
+// 		data: {
+// 			title,
+// 			clientId,
+// 			createdById: session.user.id,
+// 			status: 'DRAFT',
+// 			files: {
+// 				create: [
+// 					{
+// 						filename,
+// 						url: `/uploads/${filename}`,
+// 						type: 'PDF',
+// 					},
+// 				],
+// 			},
+// 		},
+// 	})
+
+// 	return NextResponse.json(audit)
+// }
+
 export async function POST(req) {
 	const session = await getServerSession(authOptions)
 	if (!session || session.user.role !== 'ADMIN') {
 		return new NextResponse('Unauthorized', { status: 401 })
 	}
 
-	const data = await req.formData()
-	const clientId = data.get('clientId')
-	const title = data.get('title')
-	const file = data.get('file')
+	const body = await req.json()
+	const { title, url } = body
 
-	const bytes = await file.arrayBuffer()
-	const buffer = Buffer.from(bytes)
-
-	const filename = `${uuid()}.pdf`
-	const uploadPath = path.join(process.cwd(), 'public/uploads', filename)
-	await writeFile(uploadPath, buffer)
+	if (!title || !url) {
+		return new NextResponse('Missing fields', { status: 400 })
+	}
 
 	const audit = await prisma.audit.create({
 		data: {
 			title,
-			clientId,
-			createdById: session.user.id,
+			url,
 			status: 'DRAFT',
-			files: {
-				create: [
-					{
-						filename,
-						url: `/uploads/${filename}`,
-						type: 'PDF',
-					},
-				],
-			},
+			clientId: session.user.id,
+			createdById: session.user.id,
 		},
 	})
 

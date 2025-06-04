@@ -10,9 +10,9 @@ export async function POST(req) {
 	}
 
 	const body = await req.json()
-	const { title, url, status } = body
+	const { title, url } = body
 
-	if (!title || !url || !status) {
+	if (!title || !url) {
 		return new NextResponse('Missing fields', { status: 400 })
 	}
 
@@ -20,7 +20,7 @@ export async function POST(req) {
 		data: {
 			title,
 			url,
-			status,
+			status: 'DRAFT',
 			clientId: session.user.id,
 			createdById: session.user.id,
 		},

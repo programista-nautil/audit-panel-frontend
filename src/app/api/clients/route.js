@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt'
 export async function GET() {
 	const clients = await prisma.user.findMany({
 		where: { role: 'CLIENT' },
-		select: { id: true, email: true, role: true, name: true },
+		select: { id: true, email: true, name: true },
 	})
 	return NextResponse.json(clients)
 }

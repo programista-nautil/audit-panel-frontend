@@ -12,6 +12,9 @@ export default function AdminAudits({ session }) {
 	const [expandedReports, setExpandedReports] = useState({})
 	const [auditReports, setAuditReports] = useState({})
 
+	const [clients, setClients] = useState([])
+	const [clientId, setClientId] = useState('')
+
 	const toggleReports = async auditId => {
 		setExpandedReports(prev => {
 			const isNowExpanded = !prev[auditId]
@@ -32,7 +35,7 @@ export default function AdminAudits({ session }) {
 		const res = await fetch('/api/audits', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title, url }),
+			body: JSON.stringify({ title, url, clientId }),
 		})
 		if (res.ok) {
 			setTitle('')
@@ -51,7 +54,17 @@ export default function AdminAudits({ session }) {
 		}
 	}
 
+	const fetchClients = async () => {
+		const res = await fetch('/api/clients')
+		if (res.ok) {
+			const data = await res.json()
+			setClients(data)
+		}
+		console.log(res)
+	}
+
 	useEffect(() => {
+		fetchClients()
 		fetchAudits()
 	}, [])
 
@@ -79,6 +92,21 @@ export default function AdminAudits({ session }) {
 						required
 						className='border rounded p-2 w-full'
 					/>
+				</div>
+				<div className='mb-4'>
+					<label className='block font-medium mb-1'>Przypisz do klienta</label>
+					<select
+						value={clientId}
+						onChange={e => setClientId(e.target.value)}
+						required
+						className='border rounded p-2 w-full'>
+						<option value=''>-- Wybierz klienta --</option>
+						{clients.map(client => (
+							<option key={client.id} value={client.id}>
+								{client.name || client.email}
+							</option>
+						))}
+					</select>
 				</div>
 				<button type='submit' className='bg-red-700 text-white px-4 py-2 rounded hover:bg-red-800'>
 					Dodaj audyt

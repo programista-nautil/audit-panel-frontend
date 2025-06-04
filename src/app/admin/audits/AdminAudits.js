@@ -2,7 +2,8 @@
 
 import PanelLayout from '@/components/layout/PanelLayout'
 import { useEffect, useState } from 'react'
-import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Send, Trash2 } from 'lucide-react'
+import Button from '@/components/ui/Button'
 
 export default function AdminAudits({ session }) {
 	const [title, setTitle] = useState('')
@@ -14,6 +15,9 @@ export default function AdminAudits({ session }) {
 
 	const [clients, setClients] = useState([])
 	const [clientId, setClientId] = useState('')
+
+	const [showModal, setShowModal] = useState(false)
+	const [selectedAuditId, setSelectedAuditId] = useState(null)
 
 	const toggleReports = async auditId => {
 		setExpandedReports(prev => {
@@ -114,49 +118,74 @@ export default function AdminAudits({ session }) {
 			</form>
 
 			<h3 className='text-xl font-semibold text-gray-800 mb-4'>Wszystkie audyty</h3>
-			<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'>
+			<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-start'>
 				{audits
 					.filter(a => a.url)
 					.map(audit => (
-						<div key={audit.id} className='relative bg-white border border-gray-200 rounded-lg shadow p-5'>
-							{/* Ikonka usuwania */}
-							<button
-								onClick={async () => {
-									const confirmDelete = confirm('Czy na pewno chcesz usunąć ten audyt?')
-									if (!confirmDelete) return
+						<div key={audit.id} className='bg-white border border-gray-200 rounded-lg shadow p-5 flex flex-col'>
+							{/* Górny rząd: tytuł + link po lewej, przyciski po prawej */}
+							<div className='flex justify-between items-start mb-4'>
+								<div>
+									<h4 className='text-lg font-semibold text-gray-800 mb-2'>{audit.title}</h4>
+									<a
+										href={audit.url}
+										target='_blank'
+										rel='noopener noreferrer'
+										className='inline-block text-center px-4 py-2 text-sm font-medium text-white bg-red-700 rounded hover:bg-red-800 transition'>
+										Otwórz arkusz
+									</a>
+								</div>
 
-									const res = await fetch(`/api/audits/${audit.id}`, {
-										method: 'DELETE',
-									})
+								<div className='flex items-center gap-2'>
+									{/* Rozwiń */}
+									<div className='relative group'>
+										<button className='cursor-pointer' onClick={() => toggleReports(audit.id)}>
+											{expandedReports[audit.id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+										</button>
+										<div className='absolute bottom-full mb-1 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition transform bg-gray-700 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50'>
+											Rozwiń/Schowaj
+										</div>
+									</div>
 
-									if (res.ok) {
-										setAudits(prev => prev.filter(a => a.id !== audit.id))
-									} else {
-										alert('Nie udało się usunąć audytu')
-									}
-								}}
-								className='absolute top-2 right-2 text-gray-400 hover:text-red-700 transition cursor-pointer'
-								title='Usuń audyt'>
-								<Trash2 size={18} />
-							</button>
+									{/* Usuń */}
+									<button
+										onClick={async () => {
+											const confirmDelete = confirm('Czy na pewno chcesz usunąć ten audyt?')
+											if (!confirmDelete) return
 
-							<h4 className='text-lg font-semibold text-gray-800 mb-2'>{audit.title}</h4>
-							<a
-								href={audit.url}
-								target='_blank'
-								rel='noopener noreferrer'
-								className='inline-block text-center px-4 py-2 text-sm font-medium text-white bg-red-700 rounded hover:bg-red-800 transition'>
-								Otwórz arkusz
-							</a>
-							<div className='relative group'>
-								<button className='cursor-pointer' onClick={() => toggleReports(audit.id)}>
-									{expandedReports[audit.id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-								</button>
-								<div className='absolute bottom-full mb-1 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition transform bg-gray-700 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50'>
-									Rozwiń/Schowaj
+											const res = await fetch(`/api/audits/${audit.id}`, { method: 'DELETE' })
+
+											if (res.ok) {
+												setAudits(prev => prev.filter(a => a.id !== audit.id))
+											} else {
+												alert('Nie udało się usunąć audytu')
+											}
+										}}
+										className='text-gray-400 hover:text-red-700 transition cursor-pointer'
+										title='Usuń audyt'>
+										<Trash2 size={18} />
+									</button>
+
+									{/* Dodaj raport */}
+									<div className='relative group'>
+										<Button
+											variant='red'
+											className='text-red-700 hover:text-red-800 p-1 cursor-pointer'
+											onClick={() => {
+												setSelectedAuditId(audit.id)
+												setShowModal(true)
+											}}
+											aria-label='Dodaj raport'>
+											<Send size={20} />
+										</Button>
+										<div className='absolute bottom-full mb-1 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition transform bg-gray-700 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50'>
+											Dodaj raport
+										</div>
+									</div>
 								</div>
 							</div>
 
+							{/* Raporty */}
 							{expandedReports[audit.id] && (
 								<div className='mt-2 border-t pt-2'>
 									{auditReports[audit.id]?.length > 0 ? (
@@ -182,9 +211,7 @@ export default function AdminAudits({ session }) {
 																const confirmDelete = confirm('Czy na pewno chcesz usunąć ten raport?')
 																if (!confirmDelete) return
 
-																const res = await fetch(`/api/reports/${report.id}`, {
-																	method: 'DELETE',
-																})
+																const res = await fetch(`/api/reports/${report.id}`, { method: 'DELETE' })
 
 																if (res.ok) {
 																	setAuditReports(prev => ({
@@ -205,18 +232,31 @@ export default function AdminAudits({ session }) {
 									) : (
 										<p className='text-gray-500 text-sm mb-4'>Brak raportów</p>
 									)}
-
-									<AddReportForm auditId={audit.id} onSuccess={() => toggleReports(audit.id)} />
 								</div>
 							)}
 						</div>
 					))}
+				{showModal && (
+					<div className='fixed inset-0 bg-black/50 flex justify-center items-center z-50'>
+						<div className='bg-white p-6 rounded shadow w-full max-w-md'>
+							<h4 className='text-lg font-semibold mb-4'>Dodaj raport</h4>
+							<AddReportForm
+								auditId={selectedAuditId}
+								onSuccess={() => {
+									setShowModal(false)
+									toggleReports(selectedAuditId) // odśwież raporty
+								}}
+								onCancel={() => setShowModal(false)}
+							/>
+						</div>
+					</div>
+				)}
 			</div>
 		</PanelLayout>
 	)
 }
 
-function AddReportForm({ auditId, onSuccess }) {
+function AddReportForm({ auditId, onSuccess, onCancel }) {
 	const [title, setTitle] = useState('')
 	const [version, setVersion] = useState('')
 	const [fileUrl, setFileUrl] = useState('')
@@ -245,7 +285,7 @@ function AddReportForm({ auditId, onSuccess }) {
 	}
 
 	return (
-		<form onSubmit={handleAdd} className='space-y-2 text-sm mt-2'>
+		<form onSubmit={handleAdd} className='space-y-2 text-sm'>
 			<input
 				type='text'
 				value={title}
@@ -270,12 +310,20 @@ function AddReportForm({ auditId, onSuccess }) {
 				required
 				className='border rounded px-2 py-1 w-full'
 			/>
-			<button
-				type='submit'
-				disabled={loading}
-				className='bg-red-700 text-white px-3 py-1 rounded hover:bg-red-800 disabled:opacity-50 cursor-pointer'>
-				Dodaj raport
-			</button>
+			<div className='flex justify-end gap-2 mt-4'>
+				<button
+					type='button'
+					onClick={onCancel}
+					className='bg-gray-300 text-gray-800 px-3 py-1 rounded hover:bg-gray-400'>
+					Anuluj
+				</button>
+				<button
+					type='submit'
+					disabled={loading}
+					className='bg-red-700 text-white px-3 py-1 rounded hover:bg-red-800 disabled:opacity-50'>
+					Dodaj
+				</button>
+			</div>
 		</form>
 	)
 }

@@ -11,42 +11,8 @@ export default function AdminClients({ session }) {
 	const [name, setName] = useState('')
 	const [password, setPassword] = useState('')
 
-	const [showModal, setShowModal] = useState(false)
-	const [selectedClientId, setSelectedClientId] = useState(null)
-	const [auditTitle, setAuditTitle] = useState('')
-	const [auditFile, setAuditFile] = useState(null)
-
 	const [expanded, setExpanded] = useState({})
 	const [clientAudits, setClientAudits] = useState({})
-
-	const openModal = clientId => {
-		setSelectedClientId(clientId)
-		setShowModal(true)
-	}
-
-	const sendAudit = async e => {
-		e.preventDefault()
-		if (!auditTitle || !auditFile || !selectedClientId) return
-
-		const formData = new FormData()
-		formData.append('title', auditTitle)
-		formData.append('file', auditFile)
-		formData.append('clientId', selectedClientId)
-
-		const res = await fetch('/api/audits', {
-			method: 'POST',
-			body: formData,
-		})
-
-		if (res.ok) {
-			alert('Audyt przypisany!')
-			setShowModal(false)
-			setAuditTitle('')
-			setAuditFile(null)
-		} else {
-			alert('Błąd przy wysyłaniu audytu')
-		}
-	}
 
 	useEffect(() => {
 		fetch('/api/clients')
@@ -85,27 +51,27 @@ export default function AdminClients({ session }) {
 	}
 
 	const toggleExpand = async clientId => {
-		setExpanded(prev => {
-			const isNowExpanded = !prev[clientId]
+		setExpanded(prev => ({ ...prev, [clientId]: !prev[clientId] }))
 
-			if (isNowExpanded && !clientAudits[clientId]) {
-				fetch(`/api/audits/client/${clientId}`)
-					.then(res => res.json())
-					.then(data => {
-						setClientAudits(prevAudits => ({ ...prevAudits, [clientId]: data }))
-					})
-			}
-			return { ...prev, [clientId]: isNowExpanded }
-		})
-
-		// pobierz audyty TYLKO jeśli użytkownik chce rozwinąć (czyli było false → true)
-		if (!expanded[clientId] && !clientAudits[clientId]) {
+		if (!clientAudits[clientId]) {
 			try {
 				const res = await fetch(`/api/audits/client/${clientId}`)
-				const data = await res.json()
-				setClientAudits(prev => ({ ...prev, [clientId]: data }))
+				const audits = await res.json()
+
+				// Pobierz raporty do każdego audytu
+				const reportsWithAuditInfo = await Promise.all(
+					audits.map(async audit => {
+						const reportsRes = await fetch(`/api/reports/audit/${audit.id}`)
+						const reports = await reportsRes.json()
+						return reports.map(r => ({ ...r, auditTitle: audit.title }))
+					})
+				)
+
+				const flatReports = reportsWithAuditInfo.flat()
+
+				setClientAudits(prev => ({ ...prev, [clientId]: flatReports }))
 			} catch (err) {
-				console.error('Błąd podczas pobierania audytów:', err)
+				console.error('Błąd podczas pobierania raportów klienta:', err)
 			}
 		}
 	}
@@ -179,18 +145,6 @@ export default function AdminClients({ session }) {
 							<div className='flex gap-2 items-center'>
 								<div className='relative group'>
 									<Button
-										variant='red'
-										className='text-red-700 hover:text-red-800 p-1 cursor-pointer'
-										onClick={() => openModal(client.id)}
-										aria-label='Wyślij audyt'>
-										<Send size={20} />
-									</Button>
-									<div className='absolute bottom-full mb-1 left-1/2 -translate-x-1/2 scale-0 group-hover:scale-100 transition transform bg-gray-700 text-white text-xs rounded px-2 py-1 whitespace-nowrap z-50'>
-										Wyślij audyt
-									</div>
-								</div>
-								<div className='relative group'>
-									<Button
 										variant='gray'
 										className='p-1 text-gray-600 hover:text-red-700 cursor-pointer'
 										onClick={() => deleteClient(client.id)}
@@ -216,77 +170,33 @@ export default function AdminClients({ session }) {
 							<div className='mt-4 bg-gray-50 border-t pt-2'>
 								{clientAudits[client.id]?.length > 0 ? (
 									<ul className='text-sm space-y-1'>
-										{clientAudits[client.id].map(audit => (
-											<li key={audit.id} className='flex justify-between items-center'>
+										{clientAudits[client.id].map(report => (
+											<li key={report.id} className='flex justify-between items-center'>
 												<div className='flex gap-2 items-center'>
-													<span>{audit.title}</span>
-													{audit.files?.[0] && (
+													<span>
+														{report.title} v{report.version}
+													</span>
+													{report.fileUrl && (
 														<a
-															href={audit.files[0].url}
+															href={report.fileUrl}
 															target='_blank'
 															rel='noopener noreferrer'
 															className='text-blue-600 underline text-xs'>
-															PDF
+															Plik
 														</a>
 													)}
-													<button
-														onClick={() => deleteAudit(audit.id, client.id)}
-														className='text-xs text-red-600 hover:text-red-800 cursor-pointer'>
-														Usuń
-													</button>
 												</div>
 											</li>
 										))}
 									</ul>
 								) : (
-									<p className='text-gray-500 text-sm'>Brak audytów</p>
+									<p className='text-gray-500 text-sm'>Brak raportów</p>
 								)}
 							</div>
 						)}
 					</div>
 				))}
 			</div>
-
-			{showModal && (
-				<div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50'>
-					<div className='bg-white p-6 rounded shadow-lg w-96'>
-						<h3 className='text-xl font-bold mb-4'>Wyślij audyt</h3>
-						<form onSubmit={sendAudit}>
-							<label className='block mb-2'>
-								Tytuł audytu:
-								<input
-									type='text'
-									className='border rounded p-2 w-full mt-1'
-									value={auditTitle}
-									onChange={e => setAuditTitle(e.target.value)}
-									required
-								/>
-							</label>
-							<label className='block mb-4'>
-								<span className='block mb-1 font-medium'>Plik PDF:</span>
-								<div className='relative'>
-									<input
-										type='file'
-										accept='application/pdf'
-										onChange={e => setAuditFile(e.target.files[0])}
-										required
-										className='block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-red-700 file:text-white hover:file:bg-red-800 cursor-pointer'
-									/>
-								</div>
-							</label>
-
-							<div className='flex justify-end gap-2'>
-								<Button variant='gray' type='button' onClick={() => setShowModal(false)}>
-									Anuluj
-								</Button>
-								<Button variant='red' type='submit'>
-									Wyślij
-								</Button>
-							</div>
-						</form>
-					</div>
-				</div>
-			)}
 		</PanelLayout>
 	)
 }

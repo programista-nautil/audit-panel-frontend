@@ -52,7 +52,7 @@ export default function AdminClients({ session }) {
 		fetch('/api/clients')
 			.then(res => res.json())
 			.then(data => setClients(data))
-	}, [clients])
+	}, [])
 
 	const deleteClient = async id => {
 		if (!confirm('Na pewno chcesz usunąć tego klienta i jego audyty?')) return

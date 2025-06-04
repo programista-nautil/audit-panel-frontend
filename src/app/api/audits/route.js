@@ -44,3 +44,21 @@ export async function POST(req) {
 
 	return NextResponse.json(audit)
 }
+
+export async function GET() {
+	const session = await getServerSession(authOptions)
+
+	if (!session || session.user.role !== 'ADMIN') {
+		return new NextResponse('Unauthorized', { status: 401 })
+	}
+
+	try {
+		const audits = await prisma.audit.findMany({
+			orderBy: { createdAt: 'desc' },
+		})
+		return NextResponse.json(audits)
+	} catch (error) {
+		console.error('Błąd przy pobieraniu audytów:', error)
+		return new NextResponse('Błąd serwera', { status: 500 })
+	}
+}

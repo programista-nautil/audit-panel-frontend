@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req, { params }) {
-	const { clientId } = params
+	const clientId = await params.clientId
 
 	const audits = await prisma.audit.findMany({
 		where: { clientId },

@@ -5,11 +5,22 @@ import bcrypt from 'bcrypt'
 export async function GET() {
 	const clients = await prisma.user.findMany({
 		where: { role: 'CLIENT' },
-		select: { id: true, email: true, name: true },
+		include: {
+			audits: {
+				include: {
+					reports: true,
+				},
+			},
+		},
 	})
-	return NextResponse.json(clients)
-}
 
+	const clientsWithoutPassword = clients.map(client => {
+		const { passwordHash, ...clientData } = client
+		return clientData
+	})
+
+	return NextResponse.json(clientsWithoutPassword)
+}
 export async function POST(req) {
 	const { email, password, name } = await req.json()
 

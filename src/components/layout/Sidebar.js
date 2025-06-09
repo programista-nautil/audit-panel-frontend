@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Home, FileText, ClipboardList, AlertCircle, Users, LifeBuoy, TestTube } from 'lucide-react'
+import { Home, FileText, ClipboardList, AlertCircle, Users, LifeBuoy, TestTube, Paperclip } from 'lucide-react'
 
 export default function Sidebar() {
 	const pathname = usePathname()
@@ -25,6 +25,11 @@ export default function Sidebar() {
 			href: isClient ? '/client/audits' : '/admin/audits',
 			label: 'Audyty',
 			icon: <ClipboardList className='w-5 h-5' />,
+		},
+		{
+			href: '/client/files',
+			label: 'Inne pliki',
+			icon: <Paperclip className='w-5 h-5' />,
 		},
 	]
 

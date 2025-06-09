@@ -2,7 +2,7 @@
 
 import PanelLayout from '@/components/layout/PanelLayout'
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, ChevronDown, ChevronUp, Send, Trash2, X, LoaderCircle, FileText, FileUp } from 'lucide-react'
+import { Plus, ChevronDown, Download, Send, Trash2, X, LoaderCircle, FileText, FileUp } from 'lucide-react'
 
 // Współdzielony komponent Modala (ten sam co na stronie klientów)
 function Modal({ children, onClose }) {
@@ -108,6 +108,10 @@ export default function AdminAuditsPage({ session }) {
 	const [expandedRow, setExpandedRow] = useState(null)
 	const [auditReports, setAuditReports] = useState({})
 	const [isLoadingReports, setIsLoadingReports] = useState(false)
+
+	const [auditFiles, setAuditFiles] = useState({})
+	const [isFilesSectionExpanded, setIsFilesSectionExpanded] = useState({})
+	const [isLoadingFiles, setIsLoadingFiles] = useState(false)
 
 	// Stan dla modali
 	const [isAddAuditModalOpen, setIsAddAuditModalOpen] = useState(false)
@@ -221,6 +225,28 @@ export default function AdminAuditsPage({ session }) {
 			setReportToDelete(null) // Wyczyść stan
 		} else {
 			alert('Nie udało się usunąć raportu') // Można zamienić na setError()
+		}
+	}
+
+	const fetchFilesForAudit = useCallback(async auditId => {
+		setIsLoadingFiles(true)
+		try {
+			const res = await fetch(`/api/files/audit/${auditId}`)
+			if (!res.ok) throw new Error('Błąd pobierania plików')
+			const data = await res.json()
+			setAuditFiles(prev => ({ ...prev, [auditId]: data }))
+		} catch (err) {
+			console.error('Błąd pobierania pozostałych plików:', err)
+		} finally {
+			setIsLoadingFiles(false)
+		}
+	}, [])
+
+	const toggleFilesSection = auditId => {
+		const isNowExpanded = !isFilesSectionExpanded[auditId]
+		setIsFilesSectionExpanded(prev => ({ ...prev, [auditId]: isNowExpanded }))
+		if (isNowExpanded && !auditFiles[auditId]) {
+			fetchFilesForAudit(auditId)
 		}
 	}
 
@@ -374,7 +400,57 @@ export default function AdminAuditsPage({ session }) {
 														<div className='text-center py-10'>
 															<p className='text-gray-500'>Brak raportów dla tego audytu.</p>
 														</div>
-													)}
+													)}{' '}
+													{/* === NOWA, ZWIJANA SEKCJA Z POZOSTAŁYMI PLIKAMI === */}
+													<div className='pt-4 border-t border-gray-200'>
+														<button
+															onClick={() => toggleFilesSection(audit.id)}
+															className='flex justify-between items-center w-full py-2'>
+															<h5 className='text-md font-bold text-gray-800'>Pozostałe pliki</h5>
+															<ChevronDown
+																className={`transition-transform duration-300 ${
+																	isFilesSectionExpanded[audit.id] ? 'rotate-180' : ''
+																}`}
+															/>
+														</button>
+
+														{isFilesSectionExpanded[audit.id] && (
+															<div className='mt-2 pl-2 pr-2'>
+																{isLoadingFiles ? (
+																	<div className='flex justify-center items-center h-16'>
+																		<LoaderCircle className='w-6 h-6 animate-spin text-red-600' />
+																	</div>
+																) : auditFiles[audit.id]?.length > 0 ? (
+																	<div className='space-y-2'>
+																		{auditFiles[audit.id].map(file => (
+																			<div
+																				key={file.id}
+																				className='flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200'>
+																				<div className='flex items-center gap-3 truncate'>
+																					<FileText className='text-red-600 flex-shrink-0' size={20} />
+																					<span className='text-sm text-gray-700 truncate' title={file.filename}>
+																						{file.filename}
+																					</span>
+																				</div>
+																				<a
+																					href={file.url}
+																					target='_blank'
+																					rel='noopener noreferrer'
+																					className='p-2 text-gray-500 hover:bg-gray-200 rounded-md'
+																					title='Otwórz plik'>
+																					<Download size={18} />
+																				</a>
+																			</div>
+																		))}
+																	</div>
+																) : (
+																	<div className='text-center py-4'>
+																		<p className='text-gray-500 text-sm'>Brak dodatkowych plików.</p>
+																	</div>
+																)}
+															</div>
+														)}
+													</div>
 												</div>
 											</td>
 										</tr>

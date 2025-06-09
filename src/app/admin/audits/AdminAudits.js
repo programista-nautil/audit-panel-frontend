@@ -108,6 +108,7 @@ export default function AdminAuditsPage({ session }) {
 	const [expandedRow, setExpandedRow] = useState(null)
 	const [auditReports, setAuditReports] = useState({})
 	const [isLoadingReports, setIsLoadingReports] = useState(false)
+	const [isReportsSectionExpanded, setIsReportsSectionExpanded] = useState({})
 
 	const [auditFiles, setAuditFiles] = useState({})
 	const [isFilesSectionExpanded, setIsFilesSectionExpanded] = useState({})
@@ -198,8 +199,13 @@ export default function AdminAuditsPage({ session }) {
 		const isNowExpanded = expandedRow !== auditId
 		setExpandedRow(isNowExpanded ? auditId : null)
 
-		if (isNowExpanded && !auditReports[auditId]) {
-			fetchReportsForAudit(auditId)
+		if (isNowExpanded) {
+			setIsReportsSectionExpanded(prev => ({ ...prev, [auditId]: true })) // Raporty domyślnie rozwinięte
+			setIsFilesSectionExpanded(prev => ({ ...prev, [auditId]: false })) // Pliki domyślnie zwinięte
+
+			if (!auditReports[auditId]) {
+				fetchReportsForAudit(auditId)
+			}
 		}
 	}
 
@@ -241,6 +247,10 @@ export default function AdminAuditsPage({ session }) {
 			setIsLoadingFiles(false)
 		}
 	}, [])
+
+	const toggleReportsSection = auditId => {
+		setIsReportsSectionExpanded(prev => ({ ...prev, [auditId]: !prev[auditId] }))
+	}
 
 	const toggleFilesSection = auditId => {
 		const isNowExpanded = !isFilesSectionExpanded[auditId]
@@ -353,55 +363,70 @@ export default function AdminAuditsPage({ session }) {
 									{expandedRow === audit.id && (
 										<tr className='bg-gray-50'>
 											<td colSpan='6' className='p-4'>
-												<div className='bg-white rounded-xl border-2 border-gray-100 p-6'>
-													<h4 className='text-md font-bold mb-4 text-gray-800'>
-														Raporty w ramach audytu: {audit.title}
-													</h4>
-													{isLoadingReports ? (
-														<div className='flex justify-center items-center h-16'>
-															<LoaderCircle className='w-6 h-6 animate-spin text-red-600' />
-														</div>
-													) : auditReports[audit.id]?.length > 0 ? (
-														<div className='space-y-3'>
-															{auditReports[audit.id].map(report => (
-																<div
-																	key={report.id}
-																	className='flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 transition-all'>
-																	<div className='flex items-center gap-4'>
-																		<div className='p-3 bg-red-100 rounded-full'>
-																			<FileText className='text-red-600' size={20} />
-																		</div>
-																		<div>
-																			<p className='font-bold text-md text-gray-900'>{report.title}</p>
-																			<p className='text-sm text-gray-500'>Wersja: {report.version}</p>
-																		</div>
+												<div className='bg-white rounded-xl border-2 border-gray-100 p-6 space-y-4'>
+													<div>
+														<button
+															onClick={() => toggleReportsSection(audit.id)}
+															className='flex justify-between items-center w-full py-2'>
+															<h4 className='text-md font-bold text-gray-800'>
+																Raporty w ramach audytu: {audit.title}
+															</h4>
+															<ChevronDown
+																className={`transition-transform duration-300 ${
+																	isReportsSectionExpanded[audit.id] ? 'rotate-180' : ''
+																}`}
+															/>
+														</button>
+														{isReportsSectionExpanded[audit.id] && (
+															<div className='mt-2'>
+																{isLoadingReports ? (
+																	<div className='flex justify-center items-center h-16'>
+																		<LoaderCircle className='w-6 h-6 animate-spin text-red-600' />
 																	</div>
-																	<div className='flex items-center gap-3'>
-																		{report.fileUrl && (
-																			<a
-																				href={report.fileUrl}
-																				target='_blank'
-																				rel='noopener noreferrer'
-																				className='px-3 py-1.5 text-sm font-semibold text-white bg-red-600 rounded-md hover:bg-red-700 shadow-sm'>
-																				Pobierz
-																			</a>
-																		)}
-																		<button
-																			onClick={() => openDeleteReportModal(report)}
-																			className='p-2 text-gray-500 bg-gray-200 rounded-md hover:bg-red-200 hover:text-red-700'
-																			title='Usuń raport'>
-																			<Trash2 size={18} />
-																		</button>
+																) : auditReports[audit.id]?.length > 0 ? (
+																	<div className='space-y-3'>
+																		{auditReports[audit.id].map(report => (
+																			<div
+																				key={report.id}
+																				className='flex justify-between items-center p-4 rounded-lg bg-gray-50 border border-gray-200 hover:border-red-300 hover:bg-red-50 transition-all'>
+																				<div className='flex items-center gap-4'>
+																					<div className='p-3 bg-red-100 rounded-full'>
+																						<FileText className='text-red-600' size={20} />
+																					</div>
+																					<div>
+																						<p className='font-bold text-md text-gray-900'>{report.title}</p>
+																						<p className='text-sm text-gray-500'>Wersja: {report.version}</p>
+																					</div>
+																				</div>
+																				<div className='flex items-center gap-3'>
+																					{report.fileUrl && (
+																						<a
+																							href={report.fileUrl}
+																							target='_blank'
+																							rel='noopener noreferrer'
+																							className='px-3 py-1.5 text-sm font-semibold text-white bg-red-600 rounded-md hover:bg-red-700 shadow-sm'>
+																							Pobierz
+																						</a>
+																					)}
+																					<button
+																						onClick={() => openDeleteReportModal(report)}
+																						className='p-2 text-gray-500 bg-gray-200 rounded-md hover:bg-red-200 hover:text-red-700'
+																						title='Usuń raport'>
+																						<Trash2 size={18} />
+																					</button>
+																				</div>
+																			</div>
+																		))}
 																	</div>
-																</div>
-															))}
-														</div>
-													) : (
-														<div className='text-center py-10'>
-															<p className='text-gray-500'>Brak raportów dla tego audytu.</p>
-														</div>
-													)}{' '}
-													{/* === NOWA, ZWIJANA SEKCJA Z POZOSTAŁYMI PLIKAMI === */}
+																) : (
+																	<div className='text-center py-10'>
+																		<p className='text-gray-500'>Brak raportów dla tego audytu.</p>
+																	</div>
+																)}
+															</div>
+														)}
+													</div>
+													{/* Sekcja z pozostałymi plikami */}
 													<div className='pt-4 border-t border-gray-200'>
 														<button
 															onClick={() => toggleFilesSection(audit.id)}

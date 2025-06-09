@@ -40,6 +40,21 @@ function findSheetInTree(files) {
 	return null // Nie znaleziono arkusza
 }
 
+function flattenFileTree(items) {
+	let flatList = []
+	for (const item of items) {
+		// Dodajemy tylko pliki, ignorujemy foldery jako takie
+		if (item.mimeType !== 'application/vnd.google-apps.folder') {
+			flatList.push(item)
+		}
+		// Jeśli element jest folderem i ma dzieci, przetwarzamy je dalej
+		if (item.children) {
+			flatList = flatList.concat(flattenFileTree(item.children))
+		}
+	}
+	return flatList
+}
+
 function parseVersionFromName(name) {
 	const match = name.match(/_v(\d+(\.\d+)?)/)
 	// Zwraca znalezioną wersję lub '1.0' jako domyślną
@@ -166,9 +181,10 @@ export async function GET(request) {
 		}
 
 		let newReportsCount = 0
+		let reportDocuments
 
 		if (reportsFolder && reportsFolder.children) {
-			const reportDocuments = reportsFolder.children.filter(
+			reportDocuments = reportsFolder.children.filter(
 				doc => doc.mimeType === 'application/vnd.google-apps.document' && doc.name.toLowerCase().startsWith('raport')
 			)
 
@@ -197,11 +213,11 @@ export async function GET(request) {
 		const excludedIds = new Set()
 		if (sheetFile) excludedIds.add(sheetFile.id)
 		if (clientDataFile) excludedIds.add(clientDataFile.id)
-		if (reportsFolder) excludedIds.add(reportsFolder.id)
+		reportDocuments.forEach(doc => excludedIds.add(doc.id))
 
-		const otherFilesFromDrive = nestedFiles.filter(
-			item => !excludedIds.has(item.id) && item.mimeType !== 'application/vnd.google-apps.folder'
-		)
+		const allFilesFlat = flattenFileTree(nestedFiles)
+
+		const otherFilesFromDrive = allFilesFlat.filter(file => !excludedIds.has(file.id))
 
 		if (otherFilesFromDrive.length > 0) {
 			const existingFiles = await prisma.file.findMany({

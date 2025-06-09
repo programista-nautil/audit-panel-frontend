@@ -10,6 +10,7 @@ export default function Sidebar() {
 	const { data: session } = useSession()
 	const isClient = session?.user?.role === 'CLIENT'
 
+	// Z tej tablicy usunęliśmy "Inne pliki"
 	const commonLinks = [
 		{
 			href: isClient ? '/client/dashboard' : '/admin/dashboard',
@@ -26,6 +27,9 @@ export default function Sidebar() {
 			label: 'Audyty',
 			icon: <ClipboardList className='w-5 h-5' />,
 		},
+	]
+
+	const clientLinks = [
 		{
 			href: '/client/files',
 			label: 'Inne pliki',
@@ -52,12 +56,8 @@ export default function Sidebar() {
 	]
 
 	const baseLinkClasses = 'flex items-center gap-3 py-3 px-4 rounded-lg transition-all duration-200'
-
-	// Styl dla klienta
 	const clientActiveClasses = 'bg-white/20 font-semibold'
 	const clientInactiveClasses = 'text-white/80 hover:bg-white/10 hover:text-white'
-
-	// Styl dla admina
 	const adminActiveClasses = 'bg-red-50 text-red-600 font-semibold'
 	const adminInactiveClasses = 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
 
@@ -69,16 +69,16 @@ export default function Sidebar() {
 			{/* Logo */}
 			<div
 				className={`h-20 flex items-center px-8 ${isClient ? 'border-b border-white/20' : 'border-b border-gray-200'}`}>
-				<img src={isClient ? '/nautil-logo-biale.png' : '/nautil-logo-czarne.svg'} alt='Logo' className='h-18 w-auto' />
+				<img src={isClient ? '/nautil-logo-biale.png' : '/nautil-logo-czarne.svg'} alt='Logo' className='h-10 w-auto' />
 			</div>
 
 			{/* Nawigacja */}
 			<nav className='flex-1 flex flex-col p-4 space-y-2'>
+				{/* Linki wspólne */}
 				{commonLinks.map(link => {
 					const isActive = pathname === link.href
 					const clientClasses = isActive ? clientActiveClasses : clientInactiveClasses
 					const adminClasses = isActive ? adminActiveClasses : adminInactiveClasses
-
 					return (
 						<Link
 							key={link.href}
@@ -90,6 +90,21 @@ export default function Sidebar() {
 					)
 				})}
 
+				{isClient &&
+					clientLinks.map(link => {
+						const isActive = pathname.startsWith(link.href)
+						return (
+							<Link
+								key={link.href}
+								href={link.href}
+								className={`${baseLinkClasses} ${isActive ? clientActiveClasses : clientInactiveClasses}`}>
+								{link.icon}
+								<span className='text-md'>{link.label}</span>
+							</Link>
+						)
+					})}
+
+				{/* Linki tylko dla admina */}
 				{!isClient &&
 					adminLinks.map(link => {
 						const isActive = pathname.startsWith(link.href)

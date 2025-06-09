@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Home, FileText, ClipboardList, AlertCircle, Users, LifeBuoy } from 'lucide-react'
+import { Home, FileText, ClipboardList, AlertCircle, Users, LifeBuoy, TestTube } from 'lucide-react'
 
 export default function Sidebar() {
 	const pathname = usePathname()
@@ -38,6 +38,11 @@ export default function Sidebar() {
 			href: '/admin/clients',
 			label: 'Klienci',
 			icon: <Users className='w-5 h-5' />,
+		},
+		{
+			href: '/admin/google-drive-test',
+			label: 'Test Google Drive',
+			icon: <TestTube className='w-5 h-5' />,
 		},
 	]
 

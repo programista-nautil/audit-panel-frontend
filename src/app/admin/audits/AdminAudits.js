@@ -368,9 +368,7 @@ export default function AdminAuditsPage({ session }) {
 														<button
 															onClick={() => toggleReportsSection(audit.id)}
 															className='flex justify-between items-center w-full py-2'>
-															<h4 className='text-md font-bold text-gray-800'>
-																Raporty w ramach audytu: {audit.title}
-															</h4>
+															<h4 className='text-md font-bold text-gray-800'>Raporty</h4>
 															<ChevronDown
 																className={`transition-transform duration-300 ${
 																	isReportsSectionExpanded[audit.id] ? 'rotate-180' : ''

@@ -38,7 +38,7 @@ model Audit {
   createdById  String
   status       AuditStatus
   createdAt    DateTime  @default(now())
-  url          String?   
+  url          String?   @unique
 
   client       User      @relation("ClientAudits", fields: [clientId], references: [id])
   createdBy    User      @relation("CreatedByAudits", fields: [createdById], references: [id])

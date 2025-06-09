@@ -97,57 +97,74 @@ export async function GET(request) {
 			return NextResponse.json({ files: nestedFiles, auditCreationResult })
 		}
 
+		let auditRecord
+		let auditWasCreated = false
 		let clientUser
 		let generatedPassword = null
+		let finalMessage = ''
 
-		// 1. Znajdź plik dane_klienta.txt
-		const clientDataFile = nestedFiles.find(f => f.name.toLowerCase() === 'dane_klienta.txt')
-
-		if (!clientDataFile) {
-			auditCreationResult.message = "Nie znaleziono pliku 'dane_klienta.txt' w głównym folderze audytu."
-			return NextResponse.json({ files: nestedFiles, auditCreationResult })
-		}
-
-		// 2. Odczytaj zawartość pliku
-		const fileContentStream = await drive.files.get({ fileId: clientDataFile.id, alt: 'media' })
-		const fileContent = await streamToString(fileContentStream.data)
-		const [clientName, clientEmail] = fileContent.split('\n').map(line => line.trim())
-
-		if (!clientName || !clientEmail) {
-			auditCreationResult.message =
-				"Plik 'dane_klienta.txt' ma nieprawidłowy format. Oczekiwano dwóch linii: Nazwa i Email."
-			return NextResponse.json({ files: nestedFiles, auditCreationResult })
-		}
-
-		const existingClient = await prisma.user.findUnique({ where: { email: clientEmail } })
-
-		if (existingClient) {
-			clientUser = existingClient
-		} else {
-			generatedPassword = Math.random().toString(36).slice(-8)
-			const hashedPassword = await bcrypt.hash(generatedPassword, 10)
-
-			clientUser = await prisma.user.create({
-				data: {
-					email: clientEmail,
-					name: clientName,
-					passwordHash: hashedPassword,
-					role: 'CLIENT',
-				},
-			})
-		}
-
-		const newAudit = await prisma.audit.create({
-			data: {
-				title: sheetFile.name,
-				url: sheetFile.webViewLink,
-				status: 'DRAFT',
-				clientId: clientUser.id,
-				createdById: session.user.id,
-			},
+		const existingAudit = await prisma.audit.findUnique({
+			where: { url: sheetFile.webViewLink },
 		})
 
-		let importedReportsCount = 0
+		if (existingAudit) {
+			auditRecord = existingAudit
+			finalMessage = `Audyt "${auditRecord.title}" już istnieje. `
+		} else {
+			// 1. Znajdź plik dane_klienta.txt
+			const clientDataFile = nestedFiles.find(f => f.name.toLowerCase() === 'dane_klienta.txt')
+
+			if (!clientDataFile) {
+				auditCreationResult.message = "Nie znaleziono pliku 'dane_klienta.txt' w głównym folderze audytu."
+				return NextResponse.json({ files: nestedFiles, auditCreationResult })
+			}
+
+			// 2. Odczytaj zawartość pliku
+			const fileContentStream = await drive.files.get({ fileId: clientDataFile.id, alt: 'media' })
+			const fileContent = await streamToString(fileContentStream.data)
+			const [clientName, clientEmail] = fileContent.split('\n').map(line => line.trim())
+
+			if (!clientName || !clientEmail) {
+				auditCreationResult.message =
+					"Plik 'dane_klienta.txt' ma nieprawidłowy format. Oczekiwano dwóch linii: Nazwa i Email."
+				return NextResponse.json({ files: nestedFiles, auditCreationResult })
+			}
+
+			const existingClient = await prisma.user.findUnique({ where: { email: clientEmail } })
+
+			if (existingClient) {
+				clientUser = existingClient
+			} else {
+				generatedPassword = Math.random().toString(36).slice(-8)
+				const hashedPassword = await bcrypt.hash(generatedPassword, 10)
+
+				clientUser = await prisma.user.create({
+					data: {
+						email: clientEmail,
+						name: clientName,
+						passwordHash: hashedPassword,
+						role: 'CLIENT',
+					},
+				})
+			}
+			auditRecord = await prisma.audit.create({
+				data: {
+					title: sheetFile.name,
+					url: sheetFile.webViewLink,
+					status: 'DRAFT',
+					clientId: clientUser.id,
+					createdById: session.user.id,
+				},
+			})
+			auditWasCreated = true
+
+			finalMessage = `Pomyślnie dodano audyt: "${auditRecord.title}". `
+			if (generatedPassword) {
+				finalMessage += `Utworzono nowe konto dla klienta ${clientUser.name}. Hasło tymczasowe: ${generatedPassword}. `
+			}
+		}
+
+		let newReportsCount = 0
 
 		const reportsFolder = nestedFiles.find(
 			item => item.name.toLowerCase() === 'raport' && item.mimeType === 'application/vnd.google-apps.folder'
@@ -158,37 +175,36 @@ export async function GET(request) {
 				doc => doc.mimeType === 'application/vnd.google-apps.document' && doc.name.toLowerCase().startsWith('raport')
 			)
 
-			const reportsToCreate = reportDocuments.map(doc => ({
-				title: doc.name,
-				version: parseVersionFromName(doc.name),
-				fileUrl: doc.webViewLink,
-				auditId: newAudit.id,
-			}))
+			const existingReports = await prisma.report.findMany({
+				where: { auditId: auditRecord.id },
+				select: { fileUrl: true },
+			})
+			const existingReportUrls = new Set(existingReports.map(r => r.fileUrl))
 
-			if (reportsToCreate.length > 0) {
-				const creationResult = await prisma.report.createMany({
-					data: reportsToCreate,
-				})
-				importedReportsCount = creationResult.count
+			// Odfiltruj te dokumenty z Dysku, których jeszcze nie ma w bazie
+			const newReportDocs = reportDocuments.filter(doc => !existingReportUrls.has(doc.webViewLink))
+
+			if (newReportDocs.length > 0) {
+				const reportsToCreate = newReportDocs.map(doc => ({
+					title: doc.name,
+					version: parseVersionFromName(doc.name),
+					fileUrl: doc.webViewLink,
+					auditId: auditRecord.id,
+				}))
+				const creationResult = await prisma.report.createMany({ data: reportsToCreate })
+				newReportsCount = creationResult.count
 			}
 		}
 
-		// 6. Przygotuj wiadomość zwrotną
-		let successMessage = `Pomyślnie dodano audyt: "${newAudit.title}" dla klienta ${clientUser.name} i zaimportowano ${importedReportsCount} raport(ów).`
-		if (generatedPassword) {
-			successMessage += ` Utworzono nowe konto dla klienta. Jego hasło tymczasowe to: ${generatedPassword}`
-		}
+		finalMessage += `Zsynchronizowano raporty: dodano ${newReportsCount} nowych.`
 
 		auditCreationResult = {
 			success: true,
-			message: successMessage,
-			audit: newAudit,
+			message: finalMessage,
+			audit: auditRecord,
 		}
 
-		return NextResponse.json({
-			files: nestedFiles,
-			auditCreationResult: auditCreationResult,
-		})
+		return NextResponse.json({ files: nestedFiles, auditCreationResult })
 	} catch (error) {
 		console.error('Błąd API Google Drive:', error.message)
 		return NextResponse.json(

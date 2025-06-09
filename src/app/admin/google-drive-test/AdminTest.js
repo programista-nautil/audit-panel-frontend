@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import PanelLayout from '@/components/layout/PanelLayout'
-import { Folder, File, Search, LoaderCircle } from 'lucide-react'
+import { Folder, File, Search, LoaderCircle, CheckCircle, XCircle } from 'lucide-react'
 
 function FileTree({ items }) {
 	if (!items || items.length === 0) {
@@ -39,6 +39,7 @@ export default function GoogleDriveTestPage() {
 	const [files, setFiles] = useState([])
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState('')
+	const [auditResult, setAuditResult] = useState(null)
 
 	const getFolderIdFromUrl = url => {
 		const match = url.match(/folders\/([a-zA-Z0-9-_]+)/)
@@ -48,6 +49,7 @@ export default function GoogleDriveTestPage() {
 	const handleFetchFiles = async () => {
 		setError('')
 		setFiles([])
+		setAuditResult(null)
 		const folderId = getFolderIdFromUrl(folderUrl)
 
 		if (!folderId) {
@@ -63,7 +65,8 @@ export default function GoogleDriveTestPage() {
 				throw new Error(errorData.details || 'Wystąpił błąd po stronie serwera.')
 			}
 			const data = await res.json()
-			setFiles(data)
+			setFiles(data.files || [])
+			setAuditResult(data.auditCreationResult || null)
 		} catch (e) {
 			setError(e.message)
 		} finally {
@@ -100,27 +103,50 @@ export default function GoogleDriveTestPage() {
 				</div>
 
 				{/* Sekcja z wynikami */}
-				{(files.length > 0 || error || isLoading) && (
-					<div className='bg-white p-6 rounded-2xl shadow-lg border border-gray-100'>
-						{isLoading && (
-							<div className='flex justify-center items-center h-24'>
-								<LoaderCircle className='w-8 h-8 animate-spin text-red-600' />
+				{(files.length > 0 || error || isLoading || auditResult) && (
+					<div className='space-y-4'>
+						{/* Komunikat o wyniku tworzenia audytu */}
+						{auditResult && !isLoading && (
+							<div
+								className={`flex items-start gap-4 p-4 rounded-lg border ${
+									auditResult.success ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+								}`}>
+								{auditResult.success ? (
+									<CheckCircle className='w-6 h-6 text-green-600 mt-1' />
+								) : (
+									<XCircle className='w-6 h-6 text-red-600 mt-1' />
+								)}
+								<div>
+									<h3 className={`font-bold ${auditResult.success ? 'text-green-800' : 'text-red-800'}`}>
+										{auditResult.success ? 'Operacja zakończona powodzeniem' : 'Operacja zakończona niepowodzeniem'}
+									</h3>
+									<p className={`text-sm ${auditResult.success ? 'text-green-700' : 'text-red-700'}`}>
+										{auditResult.message}
+									</p>
+								</div>
 							</div>
 						)}
 
-						{error && (
-							<div className='text-red-600 bg-red-50 p-4 rounded-lg'>
-								<h3 className='font-bold'>Wystąpił błąd:</h3>
-								<p>{error}</p>
-							</div>
-						)}
-
-						{files.length > 0 && !isLoading && (
-							<div>
-								<h3 className='text-lg font-semibold text-gray-800 mb-2'>Zawartość folderu:</h3>
-								<FileTree items={files} />
-							</div>
-						)}
+						{/* Podgląd zawartości folderu */}
+						<div className='bg-white p-6 rounded-2xl shadow-lg border border-gray-100'>
+							{isLoading && (
+								<div className='flex justify-center items-center h-24'>
+									<LoaderCircle className='w-8 h-8 animate-spin text-red-600' />
+								</div>
+							)}
+							{error && (
+								<div className='text-red-600'>
+									<h3 className='font-bold'>Błąd podglądu:</h3>
+									<p>{error}</p>
+								</div>
+							)}
+							{files.length > 0 && !isLoading && (
+								<div>
+									<h3 className='text-lg font-semibold text-gray-800 mb-2'>Podgląd zawartości folderu:</h3>
+									<FileTree items={files} />
+								</div>
+							)}
+						</div>
 					</div>
 				)}
 			</div>

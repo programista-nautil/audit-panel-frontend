@@ -102,6 +102,10 @@ export async function GET(request) {
 		let clientUser
 		let generatedPassword = null
 		let finalMessage = ''
+		const clientDataFile = nestedFiles.find(f => f.name.toLowerCase() === 'dane_klienta.txt')
+		const reportsFolder = nestedFiles.find(
+			item => item.name.toLowerCase() === 'raport' && item.mimeType === 'application/vnd.google-apps.folder'
+		)
 
 		const existingAudit = await prisma.audit.findUnique({
 			where: { url: sheetFile.webViewLink },
@@ -111,9 +115,6 @@ export async function GET(request) {
 			auditRecord = existingAudit
 			finalMessage = `Audyt "${auditRecord.title}" już istnieje. `
 		} else {
-			// 1. Znajdź plik dane_klienta.txt
-			const clientDataFile = nestedFiles.find(f => f.name.toLowerCase() === 'dane_klienta.txt')
-
 			if (!clientDataFile) {
 				auditCreationResult.message = "Nie znaleziono pliku 'dane_klienta.txt' w głównym folderze audytu."
 				return NextResponse.json({ files: nestedFiles, auditCreationResult })
@@ -166,10 +167,6 @@ export async function GET(request) {
 
 		let newReportsCount = 0
 
-		const reportsFolder = nestedFiles.find(
-			item => item.name.toLowerCase() === 'raport' && item.mimeType === 'application/vnd.google-apps.folder'
-		)
-
 		if (reportsFolder && reportsFolder.children) {
 			const reportDocuments = reportsFolder.children.filter(
 				doc => doc.mimeType === 'application/vnd.google-apps.document' && doc.name.toLowerCase().startsWith('raport')
@@ -196,7 +193,37 @@ export async function GET(request) {
 			}
 		}
 
-		finalMessage += `Zsynchronizowano raporty: dodano ${newReportsCount} nowych.`
+		let newOtherFilesCount = 0
+		const excludedIds = new Set()
+		if (sheetFile) excludedIds.add(sheetFile.id)
+		if (clientDataFile) excludedIds.add(clientDataFile.id)
+		if (reportsFolder) excludedIds.add(reportsFolder.id)
+
+		const otherFilesFromDrive = nestedFiles.filter(
+			item => !excludedIds.has(item.id) && item.mimeType !== 'application/vnd.google-apps.folder'
+		)
+
+		if (otherFilesFromDrive.length > 0) {
+			const existingFiles = await prisma.file.findMany({
+				where: { auditId: auditRecord.id },
+				select: { url: true },
+			})
+			const existingFileUrls = new Set(existingFiles.map(f => f.url))
+
+			const newFilesToCreate = otherFilesFromDrive.filter(file => !existingFileUrls.has(file.webViewLink))
+			if (newFilesToCreate.length > 0) {
+				const fileData = newFilesToCreate.map(file => ({
+					filename: file.name,
+					url: file.webViewLink,
+					type: file.mimeType,
+					auditId: auditRecord.id,
+				}))
+				const creationResult = await prisma.file.createMany({ data: fileData })
+				newOtherFilesCount = creationResult.count
+			}
+		}
+
+		finalMessage += `Zsynchronizowano raporty: dodano ${newReportsCount} nowych. Zaimportowano ${newOtherFilesCount} dodatkowych plików.`
 
 		auditCreationResult = {
 			success: true,

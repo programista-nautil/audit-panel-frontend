@@ -57,7 +57,7 @@ model Report {
   createdAt   DateTime @default(now())
   fileUrl     String 
 
-  audit       Audit    @relation(fields: [auditId], references: [id])
+  audit       Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
 
 model Error {
@@ -78,9 +78,9 @@ model File {
   auditId   String
   filename  String
   url       String
-  type      FileType
+  type      String
 
-  audit     Audit     @relation(fields: [auditId], references: [id])
+  audit     Audit  @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
 
 enum Role {
@@ -109,13 +109,6 @@ enum ErrorSeverity {
   LOW
   MEDIUM
   HIGH
-}
-
-enum FileType {
-  PDF
-  IMG
-  CSV
-  DOC
 }
 
 model Account {

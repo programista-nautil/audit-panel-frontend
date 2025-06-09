@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import { prisma } from '@/lib/prisma'
 import { google } from 'googleapis'
+import bcrypt from 'bcrypt'
 
 async function getFolderContentsRecursive(drive, folderId) {
 	const response = await drive.files.list({
@@ -45,6 +46,14 @@ function parseVersionFromName(name) {
 	return match ? match[1] : '1.0'
 }
 
+async function streamToString(stream) {
+	const chunks = []
+	for await (const chunk of stream) {
+		chunks.push(Buffer.from(chunk))
+	}
+	return Buffer.concat(chunks).toString('utf-8')
+}
+
 export async function GET(request) {
 	const session = await getServerSession(authOptions)
 
@@ -80,61 +89,100 @@ export async function GET(request) {
 
 		const nestedFiles = await getFolderContentsRecursive(drive, folderId)
 
-		let auditCreationResult = { success: false, message: 'Nie znaleziono arkusza kalkulacyjnego w folderze.' }
-
+		let auditCreationResult = { success: false, message: 'Nie można przetworzyć audytu.' }
 		const sheetFile = findSheetInTree(nestedFiles)
 
-		if (sheetFile) {
-			const defaultClient = await prisma.user.findFirst({
-				where: { name: 'Klient' },
+		if (!sheetFile) {
+			auditCreationResult.message = 'Nie znaleziono pliku Arkusza Google w folderze.'
+			return NextResponse.json({ files: nestedFiles, auditCreationResult })
+		}
+
+		let clientUser
+		let generatedPassword = null
+
+		// 1. Znajdź plik dane_klienta.txt
+		const clientDataFile = nestedFiles.find(f => f.name.toLowerCase() === 'dane_klienta.txt')
+
+		if (!clientDataFile) {
+			auditCreationResult.message = "Nie znaleziono pliku 'dane_klienta.txt' w głównym folderze audytu."
+			return NextResponse.json({ files: nestedFiles, auditCreationResult })
+		}
+
+		// 2. Odczytaj zawartość pliku
+		const fileContentStream = await drive.files.get({ fileId: clientDataFile.id, alt: 'media' })
+		const fileContent = await streamToString(fileContentStream.data)
+		const [clientName, clientEmail] = fileContent.split('\n').map(line => line.trim())
+
+		if (!clientName || !clientEmail) {
+			auditCreationResult.message =
+				"Plik 'dane_klienta.txt' ma nieprawidłowy format. Oczekiwano dwóch linii: Nazwa i Email."
+			return NextResponse.json({ files: nestedFiles, auditCreationResult })
+		}
+
+		const existingClient = await prisma.user.findUnique({ where: { email: clientEmail } })
+
+		if (existingClient) {
+			clientUser = existingClient
+		} else {
+			generatedPassword = Math.random().toString(36).slice(-8)
+			const hashedPassword = await bcrypt.hash(generatedPassword, 10)
+
+			clientUser = await prisma.user.create({
+				data: {
+					email: clientEmail,
+					name: clientName,
+					passwordHash: hashedPassword,
+					role: 'CLIENT',
+				},
 			})
+		}
 
-			if (!defaultClient) {
-				auditCreationResult.message = "Błąd: Użytkownik o nazwie 'Klient' nie został znaleziony w bazie danych."
-			} else {
-				const newAudit = await prisma.audit.create({
-					data: {
-						title: sheetFile.name, // Tytuł audytu to nazwa pliku arkusza
-						url: sheetFile.webViewLink, // Link do audytu to link do arkusza
-						status: 'DRAFT',
-						clientId: defaultClient.id, // ID domyślnego klienta
-						createdById: session.user.id, // ID zalogowanego admina
-					},
+		const newAudit = await prisma.audit.create({
+			data: {
+				title: sheetFile.name,
+				url: sheetFile.webViewLink,
+				status: 'DRAFT',
+				clientId: clientUser.id,
+				createdById: session.user.id,
+			},
+		})
+
+		let importedReportsCount = 0
+
+		const reportsFolder = nestedFiles.find(
+			item => item.name.toLowerCase() === 'raport' && item.mimeType === 'application/vnd.google-apps.folder'
+		)
+
+		if (reportsFolder && reportsFolder.children) {
+			const reportDocuments = reportsFolder.children.filter(
+				doc => doc.mimeType === 'application/vnd.google-apps.document' && doc.name.toLowerCase().startsWith('raport')
+			)
+
+			const reportsToCreate = reportDocuments.map(doc => ({
+				title: doc.name,
+				version: parseVersionFromName(doc.name),
+				fileUrl: doc.webViewLink,
+				auditId: newAudit.id,
+			}))
+
+			if (reportsToCreate.length > 0) {
+				const creationResult = await prisma.report.createMany({
+					data: reportsToCreate,
 				})
-
-				let importedReportsCount = 0
-
-				const reportsFolder = nestedFiles.find(
-					item => item.name.toLowerCase() === 'raport' && item.mimeType === 'application/vnd.google-apps.folder'
-				)
-
-				if (reportsFolder && reportsFolder.children) {
-					const reportDocuments = reportsFolder.children.filter(
-						doc =>
-							doc.mimeType === 'application/vnd.google-apps.document' && doc.name.toLowerCase().startsWith('raport')
-					)
-
-					const reportsToCreate = reportDocuments.map(doc => ({
-						title: doc.name,
-						version: parseVersionFromName(doc.name),
-						fileUrl: doc.webViewLink,
-						auditId: newAudit.id,
-					}))
-
-					if (reportsToCreate.length > 0) {
-						const creationResult = await prisma.report.createMany({
-							data: reportsToCreate,
-						})
-						importedReportsCount = creationResult.count
-					}
-				}
-
-				auditCreationResult = {
-					success: true,
-					message: `Pomyślnie dodano audyt: "${newAudit.title}"`,
-					audit: newAudit,
-				}
+				importedReportsCount = creationResult.count
 			}
+		}
+
+		// 6. Przygotuj wiadomość zwrotną
+		let successMessage = `Pomyślnie dodano audyt: "${newAudit.title}" dla klienta ${clientUser.name} i zaimportowano ${importedReportsCount} raport(ów).`
+		if (generatedPassword) {
+			successMessage += ` Utworzono nowe konto dla klienta. Jego hasło tymczasowe to: ${generatedPassword}`
+		}
+
+		auditCreationResult = {
+			success: true,
+			message: successMessage,
+			audit: newAudit,
 		}
 
 		return NextResponse.json({

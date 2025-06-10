@@ -118,9 +118,6 @@ export async function GET(request) {
 		let generatedPassword = null
 		let finalMessage = ''
 		const clientDataFile = nestedFiles.find(f => f.name.toLowerCase() === 'dane_klienta.txt')
-		const reportsFolder = nestedFiles.find(
-			item => item.name.toLowerCase() === 'raport' && item.mimeType === 'application/vnd.google-apps.folder'
-		)
 
 		const existingAudit = await prisma.audit.findUnique({
 			where: { url: sheetFile.webViewLink },
@@ -181,71 +178,86 @@ export async function GET(request) {
 		}
 
 		let newReportsCount = 0
-		let reportDocuments
+		let deletedReportsCount = 0
+		let newOtherFilesCount = 0
+		let deletedOtherFilesCount = 0
+		const reportsFolder = nestedFiles.find(
+			item => item.name.toLowerCase() === 'raport' && item.mimeType === 'application/vnd.google-apps.folder'
+		)
+		const reportDocumentsOnDrive =
+			reportsFolder && reportsFolder.children
+				? reportsFolder.children.filter(
+						doc =>
+							doc.mimeType === 'application/vnd.google-apps.document' && doc.name.toLowerCase().startsWith('raport')
+				  )
+				: []
+		const reportUrlsOnDrive = new Set(reportDocumentsOnDrive.map(doc => doc.webViewLink))
 
-		if (reportsFolder && reportsFolder.children) {
-			reportDocuments = reportsFolder.children.filter(
-				doc => doc.mimeType === 'application/vnd.google-apps.document' && doc.name.toLowerCase().startsWith('raport')
-			)
+		const existingReportsInDb = await prisma.report.findMany({ where: { auditId: auditRecord.id } })
+		const existingReportUrlsInDb = new Set(existingReportsInDb.map(r => r.fileUrl))
 
-			const existingReports = await prisma.report.findMany({
-				where: { auditId: auditRecord.id },
-				select: { fileUrl: true },
+		// 1. Usuń raporty, których nie ma już na Dysku
+		const reportsToDelete = existingReportsInDb.filter(report => !reportUrlsOnDrive.has(report.fileUrl))
+		if (reportsToDelete.length > 0) {
+			const deleteResult = await prisma.report.deleteMany({
+				where: { id: { in: reportsToDelete.map(r => r.id) } },
 			})
-			const existingReportUrls = new Set(existingReports.map(r => r.fileUrl))
-
-			// Odfiltruj te dokumenty z Dysku, których jeszcze nie ma w bazie
-			const newReportDocs = reportDocuments.filter(doc => !existingReportUrls.has(doc.webViewLink))
-
-			if (newReportDocs.length > 0) {
-				const reportsToCreate = newReportDocs.map(doc => ({
-					title: doc.name,
-					version: parseVersionFromName(doc.name),
-					fileUrl: doc.webViewLink,
-					auditId: auditRecord.id,
-				}))
-				const creationResult = await prisma.report.createMany({ data: reportsToCreate })
-				newReportsCount = creationResult.count
-			}
+			deletedReportsCount = deleteResult.count
 		}
 
-		let newOtherFilesCount = 0
+		// 2. Dodaj raporty, których nie ma jeszcze w bazie
+		const newReportDocs = reportDocumentsOnDrive.filter(doc => !existingReportUrlsInDb.has(doc.webViewLink))
+		if (newReportDocs.length > 0) {
+			const reportsToCreate = newReportDocs.map(doc => ({
+				title: doc.name,
+				version: parseVersionFromName(doc.name),
+				fileUrl: doc.webViewLink,
+				auditId: auditRecord.id,
+			}))
+			const creationResult = await prisma.report.createMany({ data: reportsToCreate })
+			newReportsCount = creationResult.count
+		}
+
+		// --- Synchronizacja Pozostałych Plików ---
+
 		const excludedIds = new Set()
 		if (sheetFile) excludedIds.add(sheetFile.id)
 		if (clientDataFile) excludedIds.add(clientDataFile.id)
-		reportDocuments.forEach(doc => excludedIds.add(doc.id))
+		reportDocumentsOnDrive.forEach(doc => excludedIds.add(doc.id))
 
-		const allFilesFlat = flattenFileTree(nestedFiles)
+		const allFilesFlatOnDrive = flattenFileTree(nestedFiles)
+		const otherFilesOnDrive = allFilesFlatOnDrive.filter(file => !excludedIds.has(file.id))
+		const otherFileUrlsOnDrive = new Set(otherFilesOnDrive.map(f => f.webViewLink))
 
-		const otherFilesFromDrive = allFilesFlat.filter(file => !excludedIds.has(file.id))
+		const existingOtherFilesInDb = await prisma.file.findMany({ where: { auditId: auditRecord.id } })
+		const existingOtherFileUrlsInDb = new Set(existingOtherFilesInDb.map(f => f.url))
 
-		if (otherFilesFromDrive.length > 0) {
-			const existingFiles = await prisma.file.findMany({
-				where: { auditId: auditRecord.id },
-				select: { url: true },
+		// 1. Usuń pliki, których nie ma już na Dysku
+		const otherFilesToDelete = existingOtherFilesInDb.filter(file => !otherFileUrlsOnDrive.has(file.url))
+		if (otherFilesToDelete.length > 0) {
+			const deleteResult = await prisma.file.deleteMany({
+				where: { id: { in: otherFilesToDelete.map(f => f.id) } },
 			})
-			const existingFileUrls = new Set(existingFiles.map(f => f.url))
-
-			const newFilesToCreate = otherFilesFromDrive.filter(file => !existingFileUrls.has(file.webViewLink))
-			if (newFilesToCreate.length > 0) {
-				const fileData = newFilesToCreate.map(file => ({
-					filename: file.name,
-					url: file.webViewLink,
-					type: file.mimeType,
-					auditId: auditRecord.id,
-				}))
-				const creationResult = await prisma.file.createMany({ data: fileData })
-				newOtherFilesCount = creationResult.count
-			}
+			deletedOtherFilesCount = deleteResult.count
 		}
 
-		finalMessage += `Zsynchronizowano raporty: dodano ${newReportsCount} nowych. Zaimportowano ${newOtherFilesCount} dodatkowych plików.`
-
-		auditCreationResult = {
-			success: true,
-			message: finalMessage,
-			audit: auditRecord,
+		// 2. Dodaj pliki, których nie ma jeszcze w bazie
+		const newFilesToCreate = otherFilesOnDrive.filter(file => !existingOtherFileUrlsInDb.has(file.webViewLink))
+		if (newFilesToCreate.length > 0) {
+			const fileData = newFilesToCreate.map(file => ({
+				filename: file.name,
+				url: file.webViewLink,
+				type: file.mimeType,
+				auditId: auditRecord.id,
+			}))
+			const creationResult = await prisma.file.createMany({ data: fileData })
+			newOtherFilesCount = creationResult.count
 		}
+
+		// --- Wiadomość końcowa ---
+		finalMessage += `Synchronizacja zakończona. Raporty: dodano ${newReportsCount}, usunięto ${deletedReportsCount}. Inne pliki: dodano ${newOtherFilesCount}, usunięto ${deletedOtherFilesCount}.`
+
+		auditCreationResult = { success: true, message: finalMessage, audit: auditRecord }
 
 		return NextResponse.json({ files: nestedFiles, auditCreationResult })
 	} catch (error) {

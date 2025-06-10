@@ -47,7 +47,7 @@ export default function Sidebar() {
 		},
 		{
 			href: '/client/settings',
-			label: 'Ustawienia',
+			label: 'Zmiana hasła',
 			icon: <Settings className='w-5 h-5' />,
 		},
 	]

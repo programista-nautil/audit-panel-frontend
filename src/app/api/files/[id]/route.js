@@ -12,24 +12,22 @@ function getGoogleFileIdFromUrl(url) {
 
 export async function DELETE(request, { params }) {
 	const session = await getServerSession(authOptions)
-	const { id: reportId } = params
+	const { id: fileId } = params
 
-	// 1. Sprawdź, czy użytkownik to zalogowany admin
 	if (!session || session.user.role !== 'ADMIN') {
 		return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
 	}
 
 	try {
-		// 2. Znajdź w naszej bazie raport, który chcemy usunąć, aby poznać jego URL
-		const reportInDb = await prisma.report.findUnique({
-			where: { id: reportId },
+		const fileInDb = await prisma.file.findUnique({
+			where: { id: fileId },
 		})
 
-		if (!reportInDb) {
-			return NextResponse.json({ error: 'Raport nie został znaleziony' }, { status: 404 })
+		if (!fileInDb) {
+			return NextResponse.json({ error: 'Plik nie został znaleziony' }, { status: 404 })
 		}
 
-		// 3. Połącz się z API Google, używając tokenów admina
+		// Połącz się z API Google
 		const account = await prisma.account.findFirst({
 			where: { userId: session.user.id, provider: 'google' },
 		})
@@ -45,30 +43,25 @@ export async function DELETE(request, { params }) {
 		})
 		const drive = google.drive({ version: 'v3', auth })
 
-		// 4. Wyciągnij ID pliku z URL-a i usuń plik z Dysku Google
-		const googleFileId = getGoogleFileIdFromUrl(reportInDb.fileUrl)
-
+		// Usuń plik z Dysku Google
+		const googleFileId = getGoogleFileIdFromUrl(fileInDb.url)
 		if (googleFileId) {
 			try {
 				await drive.files.delete({ fileId: googleFileId })
 				console.log(`Pomyślnie usunięto plik z Dysku Google: ${googleFileId}`)
 			} catch (driveError) {
-				// Jeśli plik już nie istnieje na Dysku, zaloguj błąd, ale kontynuuj
-				console.error(
-					`Nie udało się usunąć pliku z Dysku Google (ID: ${googleFileId}). Może został już usunięty? Błąd:`,
-					driveError.message
-				)
+				console.error(`Nie udało się usunąć pliku z Dysku Google (ID: ${googleFileId}). Błąd:`, driveError.message)
 			}
 		}
 
-		// 5. Na koniec, usuń rekord raportu z naszej bazy danych
-		await prisma.report.delete({
-			where: { id: reportId },
+		// Usuń rekord z naszej bazy danych
+		await prisma.file.delete({
+			where: { id: fileId },
 		})
 
-		return NextResponse.json({ message: 'Raport został pomyślnie usunięty z aplikacji i Dysku Google.' })
+		return NextResponse.json({ message: 'Plik został pomyślnie usunięty.' })
 	} catch (error) {
-		console.error('Błąd podczas usuwania raportu:', error)
+		console.error('Błąd podczas usuwania pliku:', error)
 		return NextResponse.json({ error: 'Wystąpił nieoczekiwany błąd serwera' }, { status: 500 })
 	}
 }

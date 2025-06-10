@@ -123,6 +123,8 @@ export default function AdminAuditsPage({ session }) {
 	const [isSubmitting, setIsSubmitting] = useState(false)
 	const [isDeleteReportModalOpen, setIsDeleteReportModalOpen] = useState(false)
 	const [reportToDelete, setReportToDelete] = useState(null)
+	const [fileToDelete, setFileToDelete] = useState(null)
+	const [isDeleteFileModalOpen, setIsDeleteFileModalOpen] = useState(false)
 
 	// Logika pobierania danych (bez zmian)
 	const fetchAuditsAndClients = useCallback(async () => {
@@ -257,6 +259,28 @@ export default function AdminAuditsPage({ session }) {
 		setIsFilesSectionExpanded(prev => ({ ...prev, [auditId]: isNowExpanded }))
 		if (isNowExpanded && !auditFiles[auditId]) {
 			fetchFilesForAudit(auditId)
+		}
+	}
+
+	const openDeleteFileModal = file => {
+		setFileToDelete(file)
+		setIsDeleteFileModalOpen(true)
+	}
+
+	const handleDeleteFile = async () => {
+		if (!fileToDelete) return
+
+		setIsSubmitting(true)
+		const res = await fetch(`/api/files/${fileToDelete.id}`, { method: 'DELETE' })
+		setIsSubmitting(false)
+
+		if (res.ok) {
+			const updatedFiles = auditFiles[fileToDelete.auditId].filter(f => f.id !== fileToDelete.id)
+			setAuditFiles(prev => ({ ...prev, [fileToDelete.auditId]: updatedFiles }))
+			setIsDeleteFileModalOpen(false)
+			setFileToDelete(null)
+		} else {
+			alert('Nie udało się usunąć pliku')
 		}
 	}
 
@@ -455,14 +479,22 @@ export default function AdminAuditsPage({ session }) {
 																						{file.filename}
 																					</span>
 																				</div>
-																				<a
-																					href={file.url}
-																					target='_blank'
-																					rel='noopener noreferrer'
-																					className='p-2 text-gray-500 hover:bg-gray-200 rounded-md'
-																					title='Otwórz plik'>
-																					<Download size={18} />
-																				</a>
+																				<div className='flex items-center gap-2'>
+																					<a
+																						href={file.url}
+																						target='_blank'
+																						rel='noopener noreferrer'
+																						className='p-2 text-gray-500 hover:bg-gray-200 rounded-md'
+																						title='Otwórz plik'>
+																						<Download size={18} />
+																					</a>
+																					<button
+																						onClick={() => openDeleteFileModal(file)}
+																						className='p-2 text-gray-500 hover:bg-red-200 hover:text-red-700 rounded-md'
+																						title='Usuń plik'>
+																						<Trash2 size={18} />
+																					</button>
+																				</div>
 																			</div>
 																		))}
 																	</div>
@@ -589,8 +621,8 @@ export default function AdminAuditsPage({ session }) {
 				<Modal onClose={() => setIsDeleteReportModalOpen(false)}>
 					<h3 className='text-2xl font-bold mb-4'>Potwierdź usunięcie</h3>
 					<p className='text-gray-600 mb-6'>
-						Czy na pewno chcesz usunąć raport: <span className='font-bold'>{reportToDelete?.title}</span>? Tej operacji
-						nie można cofnąć.
+						Czy na pewno chcesz usunąć raport: <span className='font-bold'>{reportToDelete?.title}</span>? Zostanie on
+						również usunięty z Dysku Google.
 					</p>
 					<div className='flex justify-end gap-4'>
 						<button
@@ -600,6 +632,30 @@ export default function AdminAuditsPage({ session }) {
 						</button>
 						<button
 							onClick={handleDeleteReport}
+							disabled={isSubmitting}
+							className='px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 font-semibold'>
+							{isSubmitting && <LoaderCircle className='animate-spin' size={16} />}
+							Tak, usuń
+						</button>
+					</div>
+				</Modal>
+			)}
+
+			{isDeleteFileModalOpen && (
+				<Modal onClose={() => setIsDeleteFileModalOpen(false)}>
+					<h3 className='text-2xl font-bold mb-4'>Potwierdź usunięcie pliku</h3>
+					<p className='text-gray-600 mb-6'>
+						Czy na pewno chcesz usunąć plik: <span className='font-bold'>{fileToDelete?.filename}</span>? Zostanie on
+						również usunięty z Dysku Google.
+					</p>
+					<div className='flex justify-end gap-4'>
+						<button
+							onClick={() => setIsDeleteFileModalOpen(false)}
+							className='px-4 py-2 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 font-semibold'>
+							Anuluj
+						</button>
+						<button
+							onClick={handleDeleteFile}
 							disabled={isSubmitting}
 							className='px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 font-semibold'>
 							{isSubmitting && <LoaderCircle className='animate-spin' size={16} />}

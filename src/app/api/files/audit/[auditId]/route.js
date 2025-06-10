@@ -3,15 +3,16 @@ import { prisma } from '@/lib/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 
-export async function GET(request, { params }) {
-	const session = await getServerSession(authOptions)
-	const { auditId } = params
+export async function GET(request, props) {
+    const params = await props.params;
+    const session = await getServerSession(authOptions)
+    const { auditId } = params
 
-	if (!session) {
+    if (!session) {
 		return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
 	}
 
-	try {
+    try {
 		const files = await prisma.file.findMany({
 			where: { auditId: auditId },
 			orderBy: { filename: 'asc' },

@@ -10,16 +10,17 @@ function getGoogleFileIdFromUrl(url) {
 	return match ? match[1] : null
 }
 
-export async function DELETE(request, { params }) {
-	const session = await getServerSession(authOptions)
-	const { id: reportId } = params
+export async function DELETE(request, props) {
+    const params = await props.params;
+    const session = await getServerSession(authOptions)
+    const { id: reportId } = params
 
-	// 1. Sprawdź, czy użytkownik to zalogowany admin
-	if (!session || session.user.role !== 'ADMIN') {
+    // 1. Sprawdź, czy użytkownik to zalogowany admin
+    if (!session || session.user.role !== 'ADMIN') {
 		return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
 	}
 
-	try {
+    try {
 		// 2. Znajdź w naszej bazie raport, który chcemy usunąć, aby poznać jego URL
 		const reportInDb = await prisma.report.findUnique({
 			where: { id: reportId },

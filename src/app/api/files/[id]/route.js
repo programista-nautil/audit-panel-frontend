@@ -10,15 +10,16 @@ function getGoogleFileIdFromUrl(url) {
 	return match ? match[1] : null
 }
 
-export async function DELETE(request, { params }) {
-	const session = await getServerSession(authOptions)
-	const { id: fileId } = params
+export async function DELETE(request, props) {
+    const params = await props.params;
+    const session = await getServerSession(authOptions)
+    const { id: fileId } = params
 
-	if (!session || session.user.role !== 'ADMIN') {
+    if (!session || session.user.role !== 'ADMIN') {
 		return NextResponse.json({ error: 'Brak autoryzacji' }, { status: 401 })
 	}
 
-	try {
+    try {
 		const fileInDb = await prisma.file.findUnique({
 			where: { id: fileId },
 		})

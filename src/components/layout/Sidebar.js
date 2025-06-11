@@ -27,19 +27,24 @@ export default function Sidebar() {
 			label: 'Pulpit',
 			icon: <Home className='w-5 h-5' />,
 		},
-		{
-			href: isClient ? '/client/reports' : '/admin/reports',
-			label: 'Raporty',
-			icon: <FileText className='w-5 h-5' />,
-		},
-		{
-			href: isClient ? '/client/audits' : '/admin/audits',
-			label: 'Audyty',
-			icon: <ClipboardList className='w-5 h-5' />,
-		},
+		// {
+		// 	href: isClient ? '/client/reports' : '/admin/reports',
+		// 	label: 'Raporty',
+		// 	icon: <FileText className='w-5 h-5' />,
+		// },
+		// {
+		// 	href: isClient ? '/client/audits' : '/admin/audits',
+		// 	label: 'Audyty',
+		// 	icon: <ClipboardList className='w-5 h-5' />,
+		// },
 	]
 
 	const clientLinks = [
+		{
+			href: '/client/reports',
+			label: 'Raporty',
+			icon: <FileText className='w-5 h-5' />,
+		},
 		{
 			href: '/client/files',
 			label: 'Inne pliki',
@@ -53,6 +58,11 @@ export default function Sidebar() {
 	]
 
 	const adminLinks = [
+		{
+			href: '/admin/audits',
+			label: 'Audyty',
+			icon: <ClipboardList className='w-5 h-5' />,
+		},
 		{
 			href: '/admin/errors',
 			label: 'Błędy',

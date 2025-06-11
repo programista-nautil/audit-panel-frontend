@@ -73,11 +73,6 @@ export default function Sidebar() {
 			label: 'Klienci',
 			icon: <Users className='w-5 h-5' />,
 		},
-		{
-			href: '/admin/google-drive-test',
-			label: 'Test Google Drive',
-			icon: <TestTube className='w-5 h-5' />,
-		},
 	]
 
 	const baseLinkClasses = 'flex items-center gap-3 py-3 px-4 rounded-lg transition-all duration-200'

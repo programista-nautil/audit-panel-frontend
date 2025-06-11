@@ -2,13 +2,21 @@
 
 import PanelLayout from '@/components/layout/PanelLayout'
 import { useEffect, useState, useCallback } from 'react'
-import { Plus, ChevronDown, Download, Send, Trash2, X, LoaderCircle, FileText, FileUp } from 'lucide-react'
+import { ChevronDown, Download, Send, Trash2, X, LoaderCircle, FileText, FileUp, Disc3 } from 'lucide-react'
+import GoogleDriveImporter from './GoogleDriveImporter'
 
 // Współdzielony komponent Modala (ten sam co na stronie klientów)
-function Modal({ children, onClose }) {
+function Modal({ children, onClose, size = 'lg' }) {
+	const sizeClasses = {
+		lg: 'max-w-lg',
+		xl: 'max-w-xl',
+		'2xl': 'max-w-2xl',
+		'4xl': 'max-w-4xl',
+	}
+
 	return (
 		<div className='fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4'>
-			<div className='bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg relative'>
+			<div className={`bg-white rounded-2xl shadow-2xl p-8 w-full ${sizeClasses[size]} relative`}>
 				<button
 					onClick={onClose}
 					className='absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition-colors'>
@@ -115,7 +123,6 @@ export default function AdminAuditsPage({ session }) {
 	const [isLoadingFiles, setIsLoadingFiles] = useState(false)
 
 	// Stan dla modali
-	const [isAddAuditModalOpen, setIsAddAuditModalOpen] = useState(false)
 	const [isAddReportModalOpen, setIsAddReportModalOpen] = useState(false)
 	const [isDeleteAuditModalOpen, setIsDeleteAuditModalOpen] = useState(false)
 	const [itemToDelete, setItemToDelete] = useState(null)
@@ -125,6 +132,8 @@ export default function AdminAuditsPage({ session }) {
 	const [reportToDelete, setReportToDelete] = useState(null)
 	const [fileToDelete, setFileToDelete] = useState(null)
 	const [isDeleteFileModalOpen, setIsDeleteFileModalOpen] = useState(false)
+
+	const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
 	// Logika pobierania danych (bez zmian)
 	const fetchAuditsAndClients = useCallback(async () => {
@@ -160,26 +169,6 @@ export default function AdminAuditsPage({ session }) {
 			setIsLoadingReports(false)
 		}
 	}, [])
-
-	// Logika dodawania audytu (bez zmian, tylko UI w modalu)
-	const handleAddAudit = async e => {
-		e.preventDefault()
-		setIsSubmitting(true)
-		setError('')
-		const res = await fetch('/api/audits', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(newAudit),
-		})
-		setIsSubmitting(false)
-		if (res.ok) {
-			setIsAddAuditModalOpen(false)
-			setNewAudit({ title: '', url: '', clientId: '' })
-			fetchAuditsAndClients()
-		} else {
-			alert('Błąd dodawania audytu') // Można to zastąpić setError()
-		}
-	}
 
 	// Logika usuwania audytu (bez zmian, tylko UI w modalu)
 	const handleDeleteAudit = async () => {
@@ -293,9 +282,9 @@ export default function AdminAuditsPage({ session }) {
 					<p className='text-gray-500 mt-1'>Twórz audyty, przypisuj je do klientów i zarządzaj raportami.</p>
 				</div>
 				<button
-					onClick={() => setIsAddAuditModalOpen(true)}
+					onClick={() => setIsImportModalOpen(true)}
 					className='flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-lg font-semibold text-sm hover:bg-red-700 transition-all shadow-md'>
-					<Plus size={18} /> Dodaj audyt
+					<Disc3 size={18} /> Importuj z Dysku
 				</button>
 			</div>
 
@@ -517,66 +506,6 @@ export default function AdminAuditsPage({ session }) {
 				)}
 			</div>
 
-			{/* Modal dodawania audytu */}
-			{isAddAuditModalOpen && (
-				<Modal onClose={() => setIsAddAuditModalOpen(false)}>
-					<h3 className='text-2xl font-bold mb-6'>Stwórz nowy audyt</h3>
-					<form onSubmit={handleAddAudit} className='space-y-4'>
-						<div>
-							<label className='block text-sm font-medium text-gray-700 mb-1'>Tytuł audytu</label>
-							<input
-								type='text'
-								value={newAudit.title}
-								onChange={e => setNewAudit({ ...newAudit, title: e.target.value })}
-								required
-								className='w-full p-2 border border-gray-300 rounded-md'
-							/>
-						</div>
-						<div>
-							<label className='block text-sm font-medium text-gray-700 mb-1'>Link do generatora (opcjonalnie)</label>
-							<input
-								type='url'
-								value={newAudit.url}
-								onChange={e => setNewAudit({ ...newAudit, url: e.target.value })}
-								className='w-full p-2 border border-gray-300 rounded-md'
-							/>
-						</div>
-						<div>
-							<label className='block text-sm font-medium text-gray-700 mb-1'>Przypisz do klienta</label>
-							<select
-								value={newAudit.clientId}
-								onChange={e => setNewAudit({ ...newAudit, clientId: e.target.value })}
-								required
-								className='w-full p-2 border border-gray-300 rounded-md'>
-								<option value='' disabled>
-									-- Wybierz klienta --
-								</option>
-								{clients.map(c => (
-									<option key={c.id} value={c.id}>
-										{c.name}
-									</option>
-								))}
-							</select>
-						</div>
-						<div className='flex justify-end gap-4 pt-4'>
-							<button
-								type='button'
-								onClick={() => setIsAddAuditModalOpen(false)}
-								className='px-4 py-2 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 font-semibold'>
-								Anuluj
-							</button>
-							<button
-								type='submit'
-								disabled={isSubmitting}
-								className='px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 font-semibold'>
-								{isSubmitting && <LoaderCircle className='animate-spin' size={16} />}
-								Stwórz audyt
-							</button>
-						</div>
-					</form>
-				</Modal>
-			)}
-
 			{/* Modal dodawania raportu */}
 			{isAddReportModalOpen && (
 				<Modal onClose={() => setIsAddReportModalOpen(false)}>
@@ -662,6 +591,16 @@ export default function AdminAuditsPage({ session }) {
 							Tak, usuń
 						</button>
 					</div>
+				</Modal>
+			)}
+
+			{isImportModalOpen && (
+				<Modal onClose={() => setIsImportModalOpen(false)} size='4xl'>
+					<GoogleDriveImporter
+						onSuccess={() => {
+							fetchAuditsAndClients()
+						}}
+					/>
 				</Modal>
 			)}
 		</PanelLayout>

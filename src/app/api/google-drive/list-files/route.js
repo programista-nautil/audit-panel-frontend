@@ -171,9 +171,9 @@ export async function GET(request) {
 			})
 			auditWasCreated = true
 
-			finalMessage = `Pomyślnie dodano audyt: "${auditRecord.title}". `
+			finalMessage = `Pomyślnie dodano audyt: "${auditRecord.title}".`
 			if (generatedPassword) {
-				finalMessage += `Utworzono nowe konto dla klienta ${clientUser.name}. Hasło tymczasowe: ${generatedPassword}. `
+				finalMessage += `\nUtworzono nowe konto dla klienta ${clientUser.name}.\nE-mail: ${clientUser.email}\nHasło tymczasowe: ${generatedPassword}. `
 			}
 		}
 
@@ -255,7 +255,7 @@ export async function GET(request) {
 		}
 
 		// --- Wiadomość końcowa ---
-		finalMessage += `Synchronizacja zakończona. Raporty: dodano ${newReportsCount}, usunięto ${deletedReportsCount}. Inne pliki: dodano ${newOtherFilesCount}, usunięto ${deletedOtherFilesCount}.`
+		finalMessage += `\nSynchronizacja zakończona.\nRaporty: dodano ${newReportsCount}, usunięto ${deletedReportsCount}. \nInne pliki: dodano ${newOtherFilesCount}, usunięto ${deletedOtherFilesCount}.`
 
 		auditCreationResult = { success: true, message: finalMessage, audit: auditRecord }
 

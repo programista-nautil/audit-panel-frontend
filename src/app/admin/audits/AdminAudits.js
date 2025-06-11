@@ -38,7 +38,8 @@ function Modal({ children, onClose, size = 'lg' }) {
 
 	return (
 		<div className='fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4'>
-			<div className={`bg-white rounded-2xl shadow-2xl p-8 w-full ${sizeClasses[size]} relative`}>
+			<div
+				className={`bg-white rounded-2xl shadow-2xl p-8 w-full ${sizeClasses[size]} relative flex flex-col max-h-[85vh]`}>
 				<button
 					onClick={onClose}
 					className='absolute top-4 right-4 text-gray-400 hover:text-gray-800 transition-colors'>

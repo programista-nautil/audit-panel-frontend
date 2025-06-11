@@ -80,8 +80,8 @@ export default function GoogleDriveImporter({ onSuccess }) {
 	return (
 		<div className='space-y-6'>
 			<div>
-				<h2 className='text-3xl font-bold text-gray-800'>Przeglądarka Dysku Google</h2>
-				<p className='text-gray-500 mt-1'>Wklej link do folderu na Dysku Google, aby wylistować jego zawartość.</p>
+				<h2 className='text-3xl font-bold text-gray-800'>Synchronizacja Dysku Google</h2>
+				<p className='text-gray-500 mt-1'>Wklej link do folderu na Dysku Google, aby zsynchronizować jego zawartość.</p>
 			</div>
 
 			{/* Sekcja z inputem */}
@@ -122,7 +122,7 @@ export default function GoogleDriveImporter({ onSuccess }) {
 								<h3 className={`font-bold ${auditResult.success ? 'text-green-800' : 'text-red-800'}`}>
 									{auditResult.success ? 'Operacja zakończona powodzeniem' : 'Operacja zakończona niepowodzeniem'}
 								</h3>
-								<p className={`text-sm ${auditResult.success ? 'text-green-700' : 'text-red-700'}`}>
+								<p className={`text-sm ${auditResult.success ? 'text-green-700' : 'text-red-700'} whitespace-pre-wrap`}>
 									{auditResult.message}
 								</p>
 							</div>
@@ -130,7 +130,7 @@ export default function GoogleDriveImporter({ onSuccess }) {
 					)}
 
 					{/* Podgląd zawartości folderu */}
-					<div className='bg-white p-6 rounded-2xl shadow-lg border border-gray-100'>
+					<div className='bg-white p-6 rounded-2xl shadow-lg border border-gray-100 max-h-[30vh] overflow-y-auto'>
 						{isLoading && (
 							<div className='flex justify-center items-center h-24'>
 								<LoaderCircle className='w-8 h-8 animate-spin text-red-600' />

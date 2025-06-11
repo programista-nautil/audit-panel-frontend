@@ -55,7 +55,8 @@ model Report {
   description String?
   version     String   
   createdAt   DateTime @default(now())
-  fileUrl     String 
+  fileUrl     String
+  isVisibleToClient Boolean  @default(false)
 
   audit       Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
@@ -70,7 +71,7 @@ model Error {
   recommendationAI String?
   isResolved       Boolean       @default(false)
 
-  audit            Audit         @relation(fields: [auditId], references: [id])
+  audit            Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }
 
 model File {
@@ -79,6 +80,7 @@ model File {
   filename  String
   url       String
   type      String
+  isVisibleToClient Boolean @default(false)
 
   audit     Audit  @relation(fields: [auditId], references: [id], onDelete: Cascade)
 }

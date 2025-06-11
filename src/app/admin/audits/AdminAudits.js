@@ -5,7 +5,29 @@ import { useEffect, useState, useCallback } from 'react'
 import { ChevronDown, Download, Send, Trash2, X, LoaderCircle, FileText, FileUp, Disc3 } from 'lucide-react'
 import GoogleDriveImporter from './GoogleDriveImporter'
 
-// Współdzielony komponent Modala (ten sam co na stronie klientów)
+function VisibilityToggle({ isVisible, onToggle, isLoading }) {
+	const label = isVisible ? 'Widoczny' : 'Ukryty'
+	return (
+		<div className='flex flex-col items-center w-24'>
+			<label
+				className='flex items-center cursor-pointer'
+				title={isVisible ? 'Ukryj przed klientem' : 'Pokaż klientowi'}>
+				<div className='relative'>
+					<input
+						type='checkbox'
+						checked={isVisible}
+						onChange={onToggle}
+						disabled={isLoading}
+						className='sr-only peer'
+					/>
+					<div className="w-14 h-8 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-1 after:start-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-green-500"></div>
+				</div>
+			</label>
+			<span className={`text-xs mt-1 font-medium ${isVisible ? 'text-green-700' : 'text-gray-500'}`}>{label}</span>
+		</div>
+	)
+}
+
 function Modal({ children, onClose, size = 'lg' }) {
 	const sizeClasses = {
 		lg: 'max-w-lg',
@@ -134,6 +156,7 @@ export default function AdminAuditsPage({ session }) {
 	const [isDeleteFileModalOpen, setIsDeleteFileModalOpen] = useState(false)
 
 	const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+	const [togglingVisibility, setTogglingVisibility] = useState({})
 
 	// Logika pobierania danych (bez zmian)
 	const fetchAuditsAndClients = useCallback(async () => {
@@ -270,6 +293,41 @@ export default function AdminAuditsPage({ session }) {
 			setFileToDelete(null)
 		} else {
 			alert('Nie udało się usunąć pliku')
+		}
+	}
+
+	const handleVisibilityToggle = async (type, item, auditId) => {
+		const itemId = item.id
+		setTogglingVisibility(prev => ({ ...prev, [itemId]: true }))
+
+		const newVisibility = !item.isVisibleToClient
+		const endpoint = type === 'report' ? `/api/reports/${itemId}/visibility` : `/api/files/${itemId}/visibility`
+
+		const stateUpdater = type === 'report' ? setAuditReports : setAuditFiles
+		stateUpdater(prev => ({
+			...prev,
+			[auditId]: prev[auditId].map(i => (i.id === itemId ? { ...i, isVisibleToClient: newVisibility } : i)),
+		}))
+
+		try {
+			const res = await fetch(endpoint, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ isVisible: newVisibility }),
+			})
+
+			if (!res.ok) {
+				throw new Error('Błąd serwera')
+			}
+		} catch (error) {
+			console.error('Nie udało się zaktualizować widoczności:', error)
+			stateUpdater(prev => ({
+				...prev,
+				[auditId]: prev[auditId].map(i => (i.id === itemId ? { ...i, isVisibleToClient: !newVisibility } : i)),
+			}))
+			alert('Błąd podczas aktualizacji widoczności.')
+		} finally {
+			setTogglingVisibility(prev => ({ ...prev, [itemId]: false }))
 		}
 	}
 
@@ -410,6 +468,11 @@ export default function AdminAuditsPage({ session }) {
 																					</div>
 																				</div>
 																				<div className='flex items-center gap-3'>
+																					<VisibilityToggle
+																						isVisible={report.isVisibleToClient}
+																						onToggle={() => handleVisibilityToggle('report', report, audit.id)}
+																						isLoading={togglingVisibility[report.id]}
+																					/>
 																					{report.fileUrl && (
 																						<a
 																							href={report.fileUrl}
@@ -468,7 +531,12 @@ export default function AdminAuditsPage({ session }) {
 																						{file.filename}
 																					</span>
 																				</div>
-																				<div className='flex items-center gap-2'>
+																				<div className='flex items-center gap-3'>
+																					<VisibilityToggle
+																						isVisible={file.isVisibleToClient}
+																						onToggle={() => handleVisibilityToggle('file', file, audit.id)}
+																						isLoading={togglingVisibility[file.id]}
+																					/>
 																					<a
 																						href={file.url}
 																						target='_blank'

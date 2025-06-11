@@ -16,12 +16,12 @@ async function getReportsData(session) {
 			// Dołączamy wszystkie raporty do każdego audytu
 			include: {
 				reports: {
+					where: { isVisibleToClient: true },
 					orderBy: { createdAt: 'desc' },
 				},
 			},
 			orderBy: { createdAt: 'desc' },
 		})
-		// Zwracamy tylko te audyty, które faktycznie mają jakieś raporty
 		return auditsWithReports.filter(audit => audit.reports.length > 0)
 	} catch (error) {
 		console.error('Błąd pobierania raportów klienta:', error)

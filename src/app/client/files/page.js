@@ -15,6 +15,7 @@ async function getFilesData(session) {
 			where: { clientId: session.user.id },
 			include: {
 				files: {
+					where: { isVisibleToClient: true },
 					orderBy: { filename: 'asc' },
 				},
 			},

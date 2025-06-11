@@ -2,19 +2,20 @@ import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
 export async function GET(request, props) {
-    const params = await props.params;
-    const { clientId } = params
-    console.log(clientId)
+	const params = await props.params
+	const { clientId } = params
+	console.log(clientId)
 
-    if (!clientId) {
+	if (!clientId) {
 		return NextResponse.json({ error: 'Client ID is required' }, { status: 400 })
 	}
 
-    try {
+	try {
 		const audits = await prisma.audit.findMany({
 			where: { clientId: clientId },
 			include: {
 				reports: {
+					where: { isVisibleToClient: true },
 					orderBy: { createdAt: 'desc' },
 					take: 1,
 				},

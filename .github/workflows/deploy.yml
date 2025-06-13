@@ -1,0 +1,42 @@
+name: Deploy to Production VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            # Przechodzimy do folderu z aplikacją na serwerze
+            cd ~/apps/audit-panel-frontend
+
+            # Pobieramy najnowsze zmiany z gałęzi main
+            git pull origin main
+
+            # Tworzymy plik .env z sekretu
+            echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
+
+            # Instalujemy zależności (jeśli doszły nowe)
+            npm install
+
+            # Generujemy klienta Prisma
+            npx prisma generate
+
+            # Uruchamiamy migracje na produkcyjnej bazie
+            npx prisma migrate deploy
+
+            # Budujemy aplikację na nowo
+            npm run build
+
+            # Przeładowujemy aplikację w PM2 (bez przerywania działania)
+            pm2 reload audit-panel
